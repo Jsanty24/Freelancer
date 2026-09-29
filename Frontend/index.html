@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Freelancer · Gestión de Proyectos</title>
+    <link rel="stylesheet" href="styles/tailwind.css">
+</head>
+<body class="bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-200 antialiased scroll-fino">
+
+    <div class="min-h-screen flex">
+
+        <aside id="sidebar"
+               class="fixed lg:static inset-y-0 left-0 z-40 w-64 shrink-0 -translate-x-full lg:translate-x-0 transition-transform duration-200 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col">
+            <div class="h-16 flex items-center gap-2 px-5 border-b border-slate-200 dark:border-slate-800">
+                <div class="w-9 h-9 rounded-xl bg-brand-600 text-white grid place-items-center font-bold">F</div>
+                <div class="leading-tight">
+                    <p class="font-semibold">Freelancer</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Gestión de proyectos</p>
+                </div>
+            </div>
+
+            <nav class="flex-1 p-3 space-y-1 text-sm" id="nav">
+                <a href="#/dashboard"     class="nav-link"    data-view="dashboard">📊 Dashboard</a>
+                <a href="#/proyectos"     class="nav-link"    data-view="proyectos">🗂 Proyectos</a>
+                <a href="#/trabajadores"  class="nav-link"    data-view="trabajadores">👷 Trabajadores</a>
+                <a href="#/asignaciones"  class="nav-link"    data-view="asignaciones">⏱ Asignaciones</a>
+                <a href="#/facturas"      class="nav-link"    data-view="facturas">🧾 Facturas</a>
+            </nav>
+
+            <div class="p-3 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 space-y-2">
+                <p class="leading-relaxed">
+                    Node.js :3000 → personas y proyectos<br>
+                    Python :5000 → asignaciones y facturas
+                </p>
+                <p id="api-estado">Sin verificar</p>
+            </div>
+        </aside>
+
+        <div class="flex-1 flex flex-col min-w-0">
+
+            <header class="h-16 sticky top-0 z-30 flex items-center gap-3 px-4 sm:px-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-800">
+                <button id="btn-menu" class="lg:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Menú">
+                    <span class="block w-5 h-0.5 bg-current mb-1"></span>
+                    <span class="block w-5 h-0.5 bg-current"></span>
+                </button>
+
+                <div>
+                    <h1 id="titulo" class="text-lg font-semibold">Dashboard</h1>
+                    <p id="subtitulo" class="text-xs text-slate-500 dark:text-slate-400">Resumen de la plataforma</p>
+                </div>
+
+                <div class="ml-auto flex items-center gap-2">
+                    <button id="btn-refresh" class="btn-sec" title="Actualizar datos">⟳ Actualizar</button>
+                    <button id="btn-tema" class="btn-sec" title="Cambiar tema">🌙 Tema</button>
+                </div>
+            </header>
+
+            <main id="vista" class="flex-1 p-4 sm:p-6 space-y-6">
+                <div class="card p-10 text-center text-slate-500">Cargando…</div>
+            </main>
+        </div>
+    </div>
+
+    <div id="modal-root"></div>
+    <div id="toast-root" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+
+    <div id="overlay" class="fixed inset-0 bg-slate-900/50 hidden lg:hidden z-30"></div>
+
+    <script src="js/config.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/views/dashboard.js"></script>
+    <script src="js/views/proyectos.js"></script>
+    <script src="js/views/trabajadores.js"></script>
+    <script src="js/views/asignaciones.js"></script>
+    <script src="js/views/facturas.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "freelancer-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interfaz web de gestión de freelancers (HTML + Tailwind + JavaScript) que consume las APIs de api's/",
+  "scripts": {
+    "build:css": "tailwindcss -i styles/tailwind.src.css -o styles/tailwind.css --minify",
+    "watch:css": "tailwindcss -i styles/tailwind.src.css -o styles/tailwind.css --watch",
+    "serve": "python -m http.server 5500 --bind 127.0.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  }
+}
