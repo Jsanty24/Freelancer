@@ -17,24 +17,24 @@ const db = mysql.createPool({
 });
 
 // Se inicia esta vuelta broderch evitando el solapamiento crack
-app.patch('/asiganaciones/:id/iniciar-temporizador', async (req, res) => {
+app.patch('/asignaciones/:id/iniciar-temporizador', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [asiganaciones] = await db.query(
-        'SESLECT idUsuario FROM asiganaciones WHERE idAsiganacion = ?',
+    const [asignaciones] = await db.query(
+        'SELECT idUsuario FROM asignaciones WHERE idAsignacion = ?',
         [id]
     );
 
-if (asiganaciones.length === 0) {
+if (asignaciones.length === 0) {
     return res.status(404).json({ message: 'Asignación no encontrada' });
 }
 
-const idUsuario = asiganaciones[0].idUsuario;
+const idUsuario = asignaciones[0].idUsuario;
 
 const [activos] = await db.query(
-    'SELECT * FROM activos WHERE idUsuario = ? AND temporizador = TRUE',
-    [idUsuario]
+    'SELECT idAsignacion FROM asignaciones WHERE idUsuario = ? AND temporizadorActivo = TRUE AND idAsignacion != ?',
+    [idUsuario, id]
 );
 
 //esto valida si la persona ojo con esto "PERSONA" no IA, tiene un temporizador activo, si lo tiene no puede iniciar otro
@@ -44,10 +44,10 @@ if (activos.length > 0) {
 });
 }
 
-await db.query(
-    'UPDATE asiganaciones SET temporizador = TRUE WHERE idAsiganacion = ?',
-    [id]
-);
+    await db.query(
+        'UPDATE asignaciones SET temporizadorActivo = TRUE WHERE idAsignacion = ?',
+        [id]
+    );
 
 res.json({ message: 'Temporizador iniciado correctamente' });
 } catch (error) {
@@ -56,12 +56,12 @@ res.json({ message: 'Temporizador iniciado correctamente' });
 });
 
 // master esto detiene estea vuelta
-app.patch('/asiganaciones/:id/detener-temporizador', async (req, res) => {
+app.patch('/asignaciones/:id/detener-temporizador', async (req, res) => {
   const { id } = req.params;
 
   try {
     await db.query(
-        'UPDATE asiganaciones SET temporizador = FALSE WHERE idAsiganacion = ?',
+        'UPDATE asignaciones SET temporizadorActivo = FALSE WHERE idAsignacion = ?',
         [id]
     );
 
@@ -126,7 +126,7 @@ app.post('/facturas', async (req, res) => {
             return res.status(404).json({ error: 'No hay horas aprobadas para facturar' });
         }
 
-        let totalFactura = 0;
+        let valorTotal = 0;
         const idAsignaciones = [];
         
         // se calcula el valor total sumando cada tarea chavalin
@@ -136,14 +136,14 @@ app.post('/facturas', async (req, res) => {
         });
         
         //crear los registros de la factura
-        await db.query(
-            'INSERT INTO facturas (fechaEmision, valorTotal, estadoFactura) VALUES (NOW(), ?, "GENERADA")',
-            [valorTotal]
+        const [resultadoFactura] = await db.query(
+            'INSERT INTO facturas (idUsuario, fechaEmision, valorTotal, estadoFactura) VALUES (?, NOW(), ?, "GENERADA")',
+            [idUsuario, valorTotal]
         );
 
         await db.query(
-            'UPDATE asignaciones SET estadoTiempo = "CONGELADO" WHERE idAsignacion IN (?)',
-            [idAsignaciones]
+        'UPDATE asignaciones SET estadoTiempo = "CONGELADO" WHERE idAsignacion IN (?)',
+        [idAsignaciones]
         );
 
         res.json({
