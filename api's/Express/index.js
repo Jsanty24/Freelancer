@@ -1,3 +1,4 @@
+// hola
 const express = require('express');
 const mysql = require('mysql/promise');
 const cors = requiere('cors');
@@ -159,3 +160,5 @@ const PORT = 3000;
 app.listen(PORT, () => {
     console.log(`API corriendo en http://localhost:${PORT}`);
 });
+
+//que onda papa, este es el index de la api, aqui se manejan las rutas y la conexion a la base de datos, si quieres agregar mas rutas, solo agregalas aqui y asegurate de que esten bien definidas.
