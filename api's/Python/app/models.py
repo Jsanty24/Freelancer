@@ -29,7 +29,7 @@ class ProyectoTecnologia(Base):
     proyecto = relationship("Proyecto", back_populates="tecnologia")
 
 class ProyectoDiseno(Base):
-    __tablename__ = "proyectos_diseño"
+    __tablename__ = "proyectos_diseno"
 
     proyecto_id = Column(Integer, ForeignKey("proyectos.id", ondelete="CASCADE"), primary_key=True)
     software_utilizado = Column(String(100), nullable=False)
