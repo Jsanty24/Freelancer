@@ -22,7 +22,7 @@ app.patch('/asignaciones/:id/iniciar-temporizador', async (req, res) => {
 
   try {
     const [asignaciones] = await db.query(
-        'SELECT idUsuario FROM asignaciones WHERE idAsignacion = ?',
+        'SELECT usuario_id FROM asignaciones WHERE id = ?',
         [id]
     );
 
@@ -30,10 +30,10 @@ if (asignaciones.length === 0) {
     return res.status(404).json({ message: 'Asignación no encontrada' });
 }
 
-const idUsuario = asignaciones[0].idUsuario;
+const idUsuario = asignaciones[0].usuario_id;
 
 const [activos] = await db.query(
-    'SELECT idAsignacion FROM asignaciones WHERE idUsuario = ? AND temporizadorActivo = TRUE AND idAsignacion != ?',
+    'SELECT id FROM asignaciones WHERE usuario_id = ? AND temporizador_activo = TRUE AND id != ?',
     [idUsuario, id]
 );
 
@@ -45,7 +45,7 @@ if (activos.length > 0) {
 }
 
     await db.query(
-        'UPDATE asignaciones SET temporizadorActivo = TRUE WHERE idAsignacion = ?',
+        'UPDATE asignaciones SET temporizador_activo = TRUE WHERE id = ?',
         [id]
     );
 
@@ -61,7 +61,7 @@ app.patch('/asignaciones/:id/detener-temporizador', async (req, res) => {
 
   try {
     await db.query(
-        'UPDATE asignaciones SET temporizadorActivo = FALSE WHERE idAsignacion = ?',
+        'UPDATE asignaciones SET temporizador_activo = FALSE WHERE id = ?',
         [id]
     );
 
@@ -78,7 +78,7 @@ app.post('/asignaciones/:id/horas-manuales', async (req, res) => {
 
   try {
     await db.query(
-        'UPDATE asignaciones SET horasAcumuladas = horasAcumuladas + ? WHERE idAsignacion = ?',
+        'UPDATE asignaciones SET horas_acumuladas = horas_acumuladas + ? WHERE id = ?',
         [horas, id]
     );
   res.json({ mensaje: 'Horas registradas correctamente' });
@@ -94,7 +94,7 @@ app.get('/asignaciones/:id/calcular-valor', async (req, res) => {
 
   try {
     const [filas] = await db.query(
-        'SELECT horasAcumuladas, tarifaPorHora FROM asignaciones WHERE idAsignacion = ?',
+        'SELECT horas_acumuladas, tarifa_por_hora FROM asignaciones WHERE id = ?',
         [id]
     );
 
@@ -102,10 +102,10 @@ app.get('/asignaciones/:id/calcular-valor', async (req, res) => {
         return res.status(404).json({  error: 'Asignación no encontrada' });
     }
 
-    const { horasAcumuladas, tarifaPorHora } = filas[0];
-    const valorTotal = horasAcumuladas * tarifaPorHora;
+    const { horas_acumuladas, tarifa_por_hora } = filas[0];
+    const valorTotal = Number(horas_acumuladas) * Number(tarifa_por_hora);
 
-    res.json({asignacion: id, horasAcumuladas, tarifaPorHora, valorTotal });
+    res.json({ asignacion: id, horasAcumuladas: Number(horas_acumuladas), tarifaPorHora: Number(tarifa_por_hora), valorTotal });
   } catch (error) {
     res.status(500).json({ error: 'Error en el servidor' + error.message });
     }
@@ -118,7 +118,7 @@ app.post('/facturas', async (req, res) => {
     try {
         //vamos a buscar registros aprobados
         const [registros] = await db.query(
-            'SELECT idAsignacion, horasAcumuladas, tarifaPorHora FROM asignaciones WHERE idUsuario = ? AND estadoTiempo = "APROBADO"',
+            'SELECT id, horas_acumuladas, tarifa_por_hora FROM asignaciones WHERE usuario_id = ? AND estado_tiempo = "APROBADO"',
             [idUsuario]
         );
 
@@ -131,19 +131,19 @@ app.post('/facturas', async (req, res) => {
         
         // se calcula el valor total sumando cada tarea chavalin
         registros.forEach(registro => {
-            valorTotal += registro.horasAcumuladas * registro.tarifaPorHora;
-            idAsignaciones.push(registro.idAsignacion);
+            valorTotal += Number(registro.horas_acumuladas) * Number(registro.tarifa_por_hora);
+            idAsignaciones.push(registro.id);
         });
         
         //crear los registros de la factura
         const [resultadoFactura] = await db.query(
-            'INSERT INTO facturas (idUsuario, fechaEmision, valorTotal, estadoFactura) VALUES (?, NOW(), ?, "GENERADA")',
+            'INSERT INTO facturas (usuario_id, fecha_emision, valor_total, estado_factura) VALUES (?, NOW(), ?, "GENERADA")',
             [idUsuario, valorTotal]
         );
 
         await db.query(
-        'UPDATE asignaciones SET estadoTiempo = "CONGELADO" WHERE idAsignacion IN (?)',
-        [idAsignaciones]
+        'UPDATE asignaciones SET estado_tiempo = "CONGELADO", factura_id = ? WHERE id IN (?)',
+        [resultadoFactura.insertId, idAsignaciones]
         );
 
         res.json({
