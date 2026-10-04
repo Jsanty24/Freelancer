@@ -53,7 +53,8 @@ if (activos.length > 0) {
 
 res.json({ message: 'Temporizador iniciado correctamente' });
 } catch (error) {
-    res.status(500).json({ error: 'Error en el servidor' + error.message });
+    console.error('Error en /asignaciones/:id/iniciar-temporizador:', error);
+    res.status(500).json({ error: 'Error en el servidor' });
 }
 });
 
@@ -69,24 +70,39 @@ app.patch('/asignaciones/:id/detener-temporizador', async (req, res) => {
 
     res.json({ message: 'Temporizador detenido correctamente' });
     } catch (error) {
-        res.status(500).json({ error: 'Error en el servidor' + error.message });
+        console.error('Error en /asignaciones/:id/detener-temporizador:', error);
+        res.status(500).json({ error: 'Error en el servidor' });
     }
 });
 
 // Ahora vamos a registrar las horinhas manuales papa 
 app.post('/asignaciones/:id/horas-manuales', async (req, res) => {
   const { id } = req.params;
-  const { horas} = req.body;
+  const { horas } = req.body;
+
+  if (horas === undefined || horas === null || isNaN(Number(horas))) {
+    return res.status(400).json({ error: 'El campo horas es obligatorio y debe ser numerico' });
+  }
+
+  if (Number(horas) <= 0) {
+    return res.status(400).json({ error: 'Las horas deben ser mayores que cero' });
+  }
 
   try {
-    await db.query(
+    const [resultado] = await db.query(
         'UPDATE asignaciones SET horas_acumuladas = horas_acumuladas + ? WHERE id = ?',
-        [horas, id]
+        [Number(horas), id]
     );
+
+    if (resultado.affectedRows === 0) {
+      return res.status(404).json({ error: 'Asignación no encontrada' });
+    }
+
   res.json({ mensaje: 'Horas registradas correctamente' });
 
     } catch (error) {
-        res.status(500).json({ error: 'Error en el servidor' + error.message });
+        console.error('Error en /asignaciones/:id/horas-manuales:', error);
+        res.status(500).json({ error: 'Error en el servidor' });
     }
 });
 
@@ -109,13 +125,18 @@ app.get('/asignaciones/:id/calcular-valor', async (req, res) => {
 
     res.json({ asignacion: id, horasAcumuladas: Number(horas_acumuladas), tarifaPorHora: Number(tarifa_por_hora), valorTotal });
   } catch (error) {
-    res.status(500).json({ error: 'Error en el servidor' + error.message });
+    console.error('Error en /asignaciones/:id/calcular-valor:', error);
+    res.status(500).json({ error: 'Error en el servidor' });
     }
 });
 
 // DE AQUI EN ADELANTE TODO LA PARTE DE FACTURA //
 app.post('/facturas', async (req, res) => {
     const { idUsuario } = req.body;
+
+    if (idUsuario === undefined || idUsuario === null || isNaN(Number(idUsuario))) {
+        return res.status(400).json({ error: 'El campo idUsuario es obligatorio y debe ser numerico' });
+    }
 
     try {
         //vamos a buscar registros aprobados
@@ -154,7 +175,8 @@ app.post('/facturas', async (req, res) => {
             valorTotal
         });
     } catch (error) {
-        res.status(500).json({ error: 'Error en el servidor' + error.message });
+        console.error('Error en /facturas:', error);
+        res.status(500).json({ error: 'Error en el servidor' });
     }
 });
 
