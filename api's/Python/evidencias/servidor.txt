@@ -1,0 +1,15 @@
+Prueba manual del servidor (python main.py, puerto 5000)
+Fecha: 
+2026-10-06 10:13:42
+
+GET / -> 200 {"status":"ok","service":"API Proyectos"}
+GET /health -> 200 {"status":"ok","service":"API Proyectos","database":"ok"}
+GET /proyectos -> 401 {"status":"error","message":"Falta el token de autenticacion. Envia Authorization: Bearer "}
+GET /openapi.json -> 200 {"openapi":"3.1.0","info":{"title":"API Proyectos - Plataforma Freelance","description":"API de proyectos de la plataforma Freelance. Administra proyectos, sus categorias, asignaciones y postulaciones sobre la base de datos `plataforma_freelance`.\n\n**Autenticacion:** todas las rutas (excepto `/` y `/health`) exigen un token Bearer JWT firmado con HS256 y el secreto compartido `JWT_SECRET`. El pa
+
+Salida de uvicorn:
+2026-10-06 10:13:37,621 | INFO | api_proyectos | Arrancando API Proyectos en el puerto 5000 (variable PORT del .env)
+INFO:     Started server process [12904]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:5000 (Press CTRL+C to quit)

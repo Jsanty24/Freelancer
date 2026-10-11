@@ -1,75 +1,321 @@
-from pydantic import BaseModel
-from typing import Optional
-from datetime import date
+from datetime import date, datetime, timedelta
 from decimal import Decimal
+from typing import Annotated, List, Literal, Optional, Union
+
+from pydantic import (
+    AnyHttpUrl,
+    BaseModel,
+    ConfigDict,
+    Field,
+    TypeAdapter,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
+
+from app.models import (
+    ESTADO_PROYECTO_INICIAL,
+    BLOQUE_POR_CATEGORIA,
+    CategoriaProyecto,
+    EstadoPostulacion,
+    EstadoProyecto,
+    EstadoTiempo,
+)
+
+MAX_NOMBRE = 150
+LIMITE_INFERIOR_FECHA = date(2000, 1, 1)
+HORAS_SEMANALES_MAX = 168
 
 
-class TecnologiaSchema(BaseModel):
+#Bloque de entrada
+
+_VALIDADOR_URL = TypeAdapter(AnyHttpUrl)
+
+
+class TecnologiaInput(BaseModel):
+    lenguaje_principal: str = Field(..., min_length=1, max_length=100)
+    repositorio_url: Optional[str] = Field(default=None, max_length=255)
+
+    @field_validator("repositorio_url")
+    @classmethod
+    def repositorio_url_valida(cls, valor: Optional[str]) -> Optional[str]:
+        if valor is None or not valor.strip():
+            return None
+        valor = valor.strip()
+        try:
+            _VALIDADOR_URL.validate_python(valor)
+        except ValidationError as exc:
+            raise ValueError(
+                "Url"
+            ) from exc
+        return valor
+
+
+class DisenoInput(BaseModel):
+    software_utilizado: str = Field(..., min_length=1, max_length=100)
+    formato_entrega: str = Field(..., min_length=1, max_length=50)
+
+
+class RedaccionInput(BaseModel):
+    cantidad_palabras: int = Field(..., gt=0, description="Debe ser mayor que 0")
+    idioma: str = Field(..., min_length=1, max_length=50)
+
+
+class MarketingInput(BaseModel):
+    plataforma_objetivo: str = Field(..., min_length=1, max_length=100)
+    tipo_campana: str = Field(..., min_length=1, max_length=100)
+
+
+class AsistenciaInput(BaseModel):
+    herramientas_manejo: str = Field(..., min_length=1, max_length=255)
+    horas_semanales_requeridas: int = Field(
+        ..., ge=1, le=HORAS_SEMANALES_MAX, description="Entre 1 y 168 horas"
+    )
+
+
+#Bloque de salida
+
+class TecnologiaEspecificacion(BaseModel):
     lenguaje_principal: str
     repositorio_url: Optional[str] = None
 
-class DisenoSchema(BaseModel):
+
+class DisenoEspecificacion(BaseModel):
     software_utilizado: str
     formato_entrega: str
 
-class RedaccionSchema(BaseModel):
+
+class RedaccionEspecificacion(BaseModel):
     cantidad_palabras: int
     idioma: str
 
-class MarketingSchema(BaseModel):
+
+class MarketingEspecificacion(BaseModel):
     plataforma_objetivo: str
     tipo_campana: str
 
-class AsistenciaSchema(BaseModel):
+
+class AsistenciaEspecificacion(BaseModel):
     herramientas_manejo: str
     horas_semanales_requeridas: int
 
 
+class GeneralEspecificacion(BaseModel):
+    """Proyecto sin bloque de categoria asociado."""
+
+
+EspecificacionesProyecto = Union[
+    TecnologiaEspecificacion,
+    DisenoEspecificacion,
+    RedaccionEspecificacion,
+    MarketingEspecificacion,
+    AsistenciaEspecificacion,
+    GeneralEspecificacion,
+]
+
+_CLAVES_CATEGORIA = tuple(BLOQUE_POR_CATEGORIA[c] for c in CategoriaProyecto)
+
+#Proyecto Crea Asigna
+
 class ProyectoCreate(BaseModel):
-    usuario_id: int
-    nombre_proyecto: str
+    nombre_proyecto: str = Field(..., min_length=1, max_length=MAX_NOMBRE)
     descripcion: Optional[str] = None
     fecha_inicio: date
-    estado: str = "En Curso"
+    estado: EstadoProyecto = ESTADO_PROYECTO_INICIAL
 
-    tecnologia: Optional[TecnologiaSchema] = None
-    diseno: Optional[DisenoSchema] = None
-    redaccion: Optional[RedaccionSchema] = None
-    marketing: Optional[MarketingSchema] = None
-    asistencia: Optional[AsistenciaSchema] = None
+    tecnologia: Optional[TecnologiaInput] = None
+    diseno: Optional[DisenoInput] = None
+    redaccion: Optional[RedaccionInput] = None
+    marketing: Optional[MarketingInput] = None
+    asistencia: Optional[AsistenciaInput] = None
+
+    @field_validator("nombre_proyecto")
+    @classmethod
+    def nombre_no_vacio(cls, valor: str) -> str:
+        valor = valor.strip()
+        if not valor:
+            raise ValueError("nombre_proyecto no puede estar vacio")
+        if len(valor) > MAX_NOMBRE:
+            raise ValueError(f"nombre_proyecto supera los {MAX_NOMBRE} caracteres")
+        return valor
+
+    @field_validator("fecha_inicio")
+    @classmethod
+    def fecha_razonable(cls, valor: date) -> date:
+        if valor < LIMITE_INFERIOR_FECHA:
+            raise ValueError("fecha_inicio no puede ser anterior al 2000-01-01")
+        if valor > date.today() + timedelta(days=365 * 5):
+            raise ValueError("fecha_inicio no puede ser mas de 5 anos en el futuro")
+        return valor
+
+    @model_validator(mode="after")
+    def exactamente_una_categoria(self):
+        presentes = [clave for clave in _CLAVES_CATEGORIA if getattr(self, clave) is not None]
+        if len(presentes) != 1:
+            raise ValueError(
+                "Debe indicar exactamente una categoria entre: "
+                + ", ".join(_CLAVES_CATEGORIA)
+                + f" (recibidas: {len(presentes)})"
+            )
+        return self
+
+    def categoria_y_bloque(self):
+        for categoria, clave in BLOQUE_POR_CATEGORIA.items():
+            if getattr(self, clave) is not None:
+                return categoria, clave
+        return None, None
 
 
 class ProyectoUpdate(BaseModel):
-    nombre_proyecto: Optional[str] = None
+    """PUT: reemplazo completo. Debe traer todos los campos."""
+
+    nombre_proyecto: str = Field(..., min_length=1, max_length=MAX_NOMBRE)
     descripcion: Optional[str] = None
-    estado: Optional[str] = None
+    estado: EstadoProyecto
+
+    @field_validator("nombre_proyecto")
+    @classmethod
+    def nombre_no_vacio(cls, valor: str) -> str:
+        valor = valor.strip()
+        if not valor:
+            raise ValueError("nombre_proyecto no puede estar vacio")
+        return valor
 
 
-class ProyectoDetalleResponse(BaseModel):
+class ProyectoPatch(BaseModel):
+    """PATCH: cambios parciales. nombre_proyecto no puede llegar como null."""
+
+    nombre_proyecto: Optional[str] = Field(default=None, max_length=MAX_NOMBRE)
+    descripcion: Optional[str] = None
+    estado: Optional[EstadoProyecto] = None
+
+    @field_validator("nombre_proyecto", mode="after")
+    @classmethod
+    def nombre_no_nulo(cls, valor: Optional[str]) -> str:
+        if valor is None:
+            raise ValueError("nombre_proyecto no puede ser null")
+        valor = valor.strip()
+        if not valor:
+            raise ValueError("nombre_proyecto no puede estar vacio")
+        return valor
+
+# Responde
+
+class _ProyectoBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     usuario_id: int
     nombre_proyecto: str
-    descripcion: Optional[str]
+    descripcion: Optional[str] = None
     fecha_inicio: date
-    estado: str
-    tipo_proyecto: str
-    especificaciones: dict
-
-    class Config:
-        from_attributes = True
+    estado: EstadoProyecto
+    categoria: Optional[CategoriaProyecto] = None
 
 
-class AsociarAsignacionInput(BaseModel):
-    usuario_id: int
-    rol_en_proyecto: str
-    tarifa_por_hora: Decimal
+class ProyectoTecnologiaResponse(_ProyectoBase):
+    tipo_proyecto: Literal["TecnologiaYProgramacion"]
+    especificaciones: TecnologiaEspecificacion
+
+
+class ProyectoDisenoResponse(_ProyectoBase):
+    tipo_proyecto: Literal["DisenoYMultimedia"]
+    especificaciones: DisenoEspecificacion
+
+
+class ProyectoRedaccionResponse(_ProyectoBase):
+    tipo_proyecto: Literal["RedaccionYContenido"]
+    especificaciones: RedaccionEspecificacion
+
+
+class ProyectoMarketingResponse(_ProyectoBase):
+    tipo_proyecto: Literal["MarketingDigitalYRedesSociales"]
+    especificaciones: MarketingEspecificacion
+
+
+class ProyectoAsistenciaResponse(_ProyectoBase):
+    tipo_proyecto: Literal["AsistenciaVirtualYAdministracion"]
+    especificaciones: AsistenciaEspecificacion
+
+
+class ProyectoGeneralResponse(_ProyectoBase):
+    tipo_proyecto: Literal["General"]
+    especificaciones: GeneralEspecificacion
+
+
+ProyectoDetalleResponse = Annotated[
+    Union[
+        ProyectoTecnologiaResponse,
+        ProyectoDisenoResponse,
+        ProyectoRedaccionResponse,
+        ProyectoMarketingResponse,
+        ProyectoAsistenciaResponse,
+        ProyectoGeneralResponse,
+    ],
+    Field(discriminator="tipo_proyecto"),
+]
+
+
+class ProyectoListResponse(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    items: List[ProyectoDetalleResponse]
 
 
 class ProgresoResponse(BaseModel):
     proyecto_id: int
     nombre_proyecto: str
-    estado: str
+    estado: EstadoProyecto
     fecha_inicio: date
     dias_activo: int
-    tipo_proyecto: str
-    detalles_especialidad: dict
+    horas_aprobadas: Decimal
+    horas_pendientes: Decimal
+    numero_asignaciones: int
+    costo_acumulado: Decimal
+    tipo_proyecto: Literal[
+        "TecnologiaYProgramacion",
+        "DisenoYMultimedia",
+        "RedaccionYContenido",
+        "MarketingDigitalYRedesSociales",
+        "AsistenciaVirtualYAdministracion",
+        "General",
+    ]
+    detalles_especialidad: EspecificacionesProyecto
+
+
+class AsignacionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    proyecto_id: int
+    usuario_id: int
+    rol_en_proyecto: str
+    tarifa_por_hora: Decimal
+    temporizador_activo: bool
+    estado_tiempo: EstadoTiempo
+    factura_id: Optional[int] = None
+
+
+# --------------------------------------------------------------------------
+# Postulaciones
+# --------------------------------------------------------------------------
+class PostulacionCreate(BaseModel):
+    tarifa_por_hora: Decimal = Field(..., gt=0, max_digits=10, decimal_places=2)
+    mensaje: Optional[str] = Field(default=None, max_length=1000)
+
+
+class PostulacionRespuesta(BaseModel):
+    estado: Literal["ACEPTADA", "RECHAZADA"]
+
+
+class PostulacionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    proyecto_id: int
+    usuario_id: int
+    tarifa_por_hora: Decimal
+    mensaje: Optional[str] = None
+    estado: EstadoPostulacion
+    fecha_postulacion: datetime
