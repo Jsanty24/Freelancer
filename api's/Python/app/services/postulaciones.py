@@ -3,7 +3,6 @@ import logging
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.auth import UsuarioToken
 from app.errors import ErrorAPI
 from app.models import (
     EstadoPostulacion,
@@ -18,14 +17,14 @@ from app.services.proyectos import buscar_o_404
 logger = logging.getLogger("api_proyectos.postulaciones")
 
 
-def _exigir_trabajador(db: Session, usuario: UsuarioToken) -> None:
-    if db.get(Trabajador, usuario.id) is None:
-        if db.get(Usuario, usuario.id) is None:
-            raise ErrorAPI(404, "El usuario autenticado no existe")
-        raise ErrorAPI(404, "El usuario autenticado no esta registrado como trabajador")
+def _exigir_trabajador(db: Session, trabajador_id: int) -> None:
+    if db.get(Trabajador, trabajador_id) is None:
+        if db.get(Usuario, trabajador_id) is None:
+            raise ErrorAPI(404, "El trabajador indicado no existe")
+        raise ErrorAPI(404, "El usuario indicado no esta registrado como trabajador")
 
 
-def crear(db: Session, usuario: UsuarioToken, proyecto_id: int, data: PostulacionCreate) -> Postulacion:
+def crear(db: Session, proyecto_id: int, data: PostulacionCreate) -> Postulacion:
     proyecto = buscar_o_404(db, proyecto_id)
 
     if EstadoProyecto(proyecto.estado) != EstadoProyecto.ABIERTO:
@@ -35,11 +34,14 @@ def crear(db: Session, usuario: UsuarioToken, proyecto_id: int, data: Postulacio
             f"(estado actual: {EstadoProyecto(proyecto.estado).value})",
         )
 
-    _exigir_trabajador(db, usuario)
+    _exigir_trabajador(db, data.trabajador_id)
 
     duplicada = (
         db.query(Postulacion)
-        .filter(Postulacion.proyecto_id == proyecto_id, Postulacion.usuario_id == usuario.id)
+        .filter(
+            Postulacion.proyecto_id == proyecto_id,
+            Postulacion.trabajador_id == data.trabajador_id,
+        )
         .first()
     )
     if duplicada is not None:
@@ -48,8 +50,8 @@ def crear(db: Session, usuario: UsuarioToken, proyecto_id: int, data: Postulacio
     try:
         postulacion = Postulacion(
             proyecto_id=proyecto_id,
-            usuario_id=usuario.id,
-            tarifa_por_hora=data.tarifa_por_hora,
+            trabajador_id=data.trabajador_id,
+            tarifa_propuesta=data.tarifa_propuesta,
             mensaje=data.mensaje,
         )
         db.add(postulacion)
@@ -57,8 +59,8 @@ def crear(db: Session, usuario: UsuarioToken, proyecto_id: int, data: Postulacio
     except IntegrityError as exc:
         db.rollback()
         logger.warning(
-            "Duplicada o violacion de integridad al postular el usuario %s al proyecto %s: %s",
-            usuario.id,
+            "Duplicada o violacion de integridad al postular el trabajador %s al proyecto %s: %s",
+            data.trabajador_id,
             proyecto_id,
             exc,
         )
@@ -72,10 +74,8 @@ def crear(db: Session, usuario: UsuarioToken, proyecto_id: int, data: Postulacio
     return postulacion
 
 
-def listar(db: Session, usuario: UsuarioToken, proyecto_id: int) -> list[Postulacion]:
-    proyecto = buscar_o_404(db, proyecto_id)
-    if proyecto.usuario_id != usuario.id:
-        raise ErrorAPI(403, "Solo el cliente propietario del proyecto puede ver sus postulaciones")
+def listar(db: Session, proyecto_id: int) -> list[Postulacion]:
+    buscar_o_404(db, proyecto_id)
     return (
         db.query(Postulacion)
         .filter(Postulacion.proyecto_id == proyecto_id)
@@ -85,15 +85,13 @@ def listar(db: Session, usuario: UsuarioToken, proyecto_id: int) -> list[Postula
 
 
 def responder(
-    db: Session, usuario: UsuarioToken, postulacion_id: int, data: PostulacionRespuesta
+    db: Session, postulacion_id: int, data: PostulacionRespuesta
 ) -> Postulacion:
     postulacion = db.get(Postulacion, postulacion_id)
     if postulacion is None:
         raise ErrorAPI(404, "Postulacion no encontrada")
 
-    proyecto = buscar_o_404(db, postulacion.proyecto_id)
-    if proyecto.usuario_id != usuario.id:
-        raise ErrorAPI(403, "Solo el cliente propietario del proyecto puede responder postulaciones")
+    buscar_o_404(db, postulacion.proyecto_id)
 
     if EstadoPostulacion(postulacion.estado) != EstadoPostulacion.PENDIENTE:
         raise ErrorAPI(

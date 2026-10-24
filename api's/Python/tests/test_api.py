@@ -1,4 +1,4 @@
-"""Pruebas de la API Proyectos (FastAPI + TestClient + base de datos real).
+"""Pruebas de la API Proyectos (FastAPI + TestClient + base de datos real, sin JWT).
 
 Ejecutar desde la carpeta api's/Python:
 
@@ -6,15 +6,19 @@ Ejecutar desde la carpeta api's/Python:
 """
 
 import os
+import sys
 import uuid
 from datetime import datetime, timedelta, timezone
+from dotenv import load_dotenv
 
-import jwt
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, BASE_DIR)
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+
 import pytest
 from fastapi.testclient import TestClient
 
 import main
-from app.auth import JWT_SECRET
 from app.database import SessionLocal
 from app.models import (
     Asignacion,
@@ -26,21 +30,10 @@ from app.models import (
     Usuario,
 )
 
-ALGORITMO = "HS256"
-
 
 # ---------------------------------------------------------------------------
 # Utilidades
 # ---------------------------------------------------------------------------
-def token_de(usuario_id: int, rol: str = "CLIENTE", exp_en_minutos: int = 60) -> str:
-    payload = {
-        "sub": str(usuario_id),
-        "rol": rol,
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=exp_en_minutos),
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm=ALGORITMO)
-
-
 def crear_usuario(rol: str) -> int:
     db = SessionLocal()
     sufijo = uuid.uuid4().hex[:10]
@@ -48,6 +41,8 @@ def crear_usuario(rol: str) -> int:
         nombre=f"Usuario {rol} {sufijo}",
         email=f"{rol.lower()}_{sufijo}@pruebas.test",
         telefono="3000000000",
+        password_hash="$2y$10$hashdepruebasautomatizadas1234567890",
+        rol=rol,
     )
     db.add(usuario)
     db.flush()
@@ -69,7 +64,7 @@ def crear_usuario(rol: str) -> int:
 
 def eliminar_usuario(usuario_id: int) -> None:
     db = SessionLocal()
-    ids_proyectos = [f[0] for f in db.query(Proyecto.id).filter(Proyecto.usuario_id == usuario_id)]
+    ids_proyectos = [f[0] for f in db.query(Proyecto.id).filter(Proyecto.cliente_id == usuario_id)]
     if ids_proyectos:
         ids_asignaciones = [
             f[0] for f in db.query(Asignacion.id).filter(Asignacion.proyecto_id.in_(ids_proyectos))
@@ -86,7 +81,7 @@ def eliminar_usuario(usuario_id: int) -> None:
         )
         db.query(Proyecto).filter(Proyecto.id.in_(ids_proyectos)).delete(synchronize_session=False)
 
-    db.query(Postulacion).filter(Postulacion.usuario_id == usuario_id).delete(
+    db.query(Postulacion).filter(Postulacion.trabajador_id == usuario_id).delete(
         synchronize_session=False
     )
     db.query(Cliente).filter(Cliente.usuario_id == usuario_id).delete(synchronize_session=False)
@@ -98,8 +93,9 @@ def eliminar_usuario(usuario_id: int) -> None:
     db.close()
 
 
-def cuerpo_proyecto(**extra) -> dict:
+def cuerpo_proyecto(cliente_id: int, **extra) -> dict:
     cuerpo = {
+        "cliente_id": cliente_id,
         "nombre_proyecto": "Proyecto de pruebas automatizadas",
         "descripcion": "Creado por pytest",
         "fecha_inicio": "2026-01-15",
@@ -112,14 +108,17 @@ def cuerpo_proyecto(**extra) -> dict:
     return cuerpo
 
 
-def auth(usuario_id: int, rol: str = "CLIENTE") -> dict:
-    return {"Authorization": f"Bearer {token_de(usuario_id, rol)}"}
-
-
 @pytest.fixture(scope="session")
 def client():
-    with TestClient(main.app) as instancia:
+    with TestClient(main.app, headers={"X-Internal-Key": main.INTERNAL_API_KEY}) as instancia:
         yield instancia
+
+
+def test_acceso_directo_sin_clave_interna_responde_403():
+    with TestClient(main.app) as cliente_directo:
+        respuesta = cliente_directo.get("/proyectos")
+        assert respuesta.status_code == 403
+        assert "Gateway" in respuesta.json()["message"]
 
 
 @pytest.fixture(scope="session")
@@ -128,25 +127,16 @@ def usuarios():
         "cliente": crear_usuario("CLIENTE"),
         "trabajador": crear_usuario("TRABAJADOR"),
     }
-    datos["token_cliente"] = token_de(datos["cliente"], "CLIENTE")
-    datos["token_trabajador"] = token_de(datos["trabajador"], "TRABAJADOR")
     yield datos
     for identificador in datos.values():
         if isinstance(identificador, int):
             eliminar_usuario(identificador)
 
 
-@pytest.fixture
-def otro_cliente():
-    identificador = crear_usuario("CLIENTE")
-    yield identificador
-    eliminar_usuario(identificador)
-
-
 # ---------------------------------------------------------------------------
-# Rutas publicas y autenticacion
+# Rutas de estado
 # ---------------------------------------------------------------------------
-def test_raiz_y_health_no_piden_token(client):
+def test_raiz_y_health(client):
     raiz = client.get("/")
     assert raiz.status_code == 200
     assert raiz.json() == {"status": "ok", "service": "API Proyectos"}
@@ -156,98 +146,62 @@ def test_raiz_y_health_no_piden_token(client):
     assert salud.json()["database"] == "ok"
 
 
-def test_sin_token_responde_401(client):
-    respuesta = client.get("/proyectos")
-    assert respuesta.status_code == 401
-    assert respuesta.json() == {
-        "status": "error",
-        "message": "Falta el token de autenticacion. Envia Authorization: Bearer <token>",
-    }
-    assert respuesta.headers.get("www-authenticate") == "Bearer"
-
-
-def test_token_vencido_responde_401(client, usuarios):
-    vencido = token_de(usuarios["cliente"], "CLIENTE", exp_en_minutos=-5)
-    respuesta = client.get("/proyectos", headers={"Authorization": f"Bearer {vencido}"})
-    assert respuesta.status_code == 401
-    assert respuesta.json()["message"] == "El token ha expirado"
-
-
-def test_token_de_otro_secreto_responde_401(client):
-    ajeno = jwt.encode(
-        {"sub": "1", "rol": "CLIENTE", "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
-        "secreto-distinto-y-largo-para-la-prueba-0123456789",
-        algorithm=ALGORITMO,
-    )
-    respuesta = client.get("/proyectos", headers={"Authorization": f"Bearer {ajeno}"})
-    assert respuesta.status_code == 401
-    assert "Token invalido" in respuesta.json()["message"]
-
-
 # ---------------------------------------------------------------------------
 # Crear proyecto
 # ---------------------------------------------------------------------------
 def test_trabajador_no_puede_crear_proyecto(client, usuarios):
-    respuesta = client.post("/proyectos", json=cuerpo_proyecto(), headers=auth(usuarios["trabajador"], "TRABAJADOR"))
-    assert respuesta.status_code == 403
+    respuesta = client.post("/proyectos", json=cuerpo_proyecto(usuarios["trabajador"]))
+    assert respuesta.status_code == 404
     assert respuesta.json()["status"] == "error"
-    assert "CLIENTE" in respuesta.json()["message"]
+    assert "cliente" in respuesta.json()["message"].lower()
 
 
 def test_crear_proyecto_ok(client, usuarios):
-    respuesta = client.post(
-        "/proyectos", json=cuerpo_proyecto(), headers=auth(usuarios["cliente"])
-    )
+    respuesta = client.post("/proyectos", json=cuerpo_proyecto(usuarios["cliente"]))
     assert respuesta.status_code == 201
     dato = respuesta.json()
-    assert dato["usuario_id"] == usuarios["cliente"]
-    assert dato["tipo_proyecto"] == "TecnologiaYProgramacion"
-    assert dato["categoria"] == "TecnologiaYProgramacion"
+    assert dato["cliente_id"] == usuarios["cliente"]
+    assert dato["tipo_proyecto"] == "TECNOLOGIA"
+    assert dato["tipo"] == "TECNOLOGIA"
     assert dato["estado"] == "ABIERTO"
     assert dato["especificaciones"]["lenguaje_principal"] == "Python"
 
 
 def test_crear_sin_categoria_responde_422(client, usuarios):
-    cuerpo = cuerpo_proyecto()
+    cuerpo = cuerpo_proyecto(usuarios["cliente"])
     cuerpo.pop("tecnologia")
-    respuesta = client.post("/proyectos", json=cuerpo, headers=auth(usuarios["cliente"]))
+    respuesta = client.post("/proyectos", json=cuerpo)
     assert respuesta.status_code == 422
     assert respuesta.json()["status"] == "error"
     assert "exactamente una categoria" in str(respuesta.json()["errors"])
 
 
 def test_crear_con_dos_categorias_responde_422(client, usuarios):
-    cuerpo = cuerpo_proyecto(diseno={"software_utilizado": "Figma", "formato_entrega": "PNG"})
-    respuesta = client.post("/proyectos", json=cuerpo, headers=auth(usuarios["cliente"]))
+    cuerpo = cuerpo_proyecto(
+        usuarios["cliente"], diseno={"software_utilizado": "Figma", "formato_entrega": "PNG"}
+    )
+    respuesta = client.post("/proyectos", json=cuerpo)
     assert respuesta.status_code == 422
     assert "exactamente una categoria" in str(respuesta.json()["errors"])
 
 
-def test_crear_con_usuario_inexistente_responde_404(client):
-    token_fantasma = token_de(999999, "CLIENTE")
-    respuesta = client.post(
-        "/proyectos",
-        json=cuerpo_proyecto(),
-        headers={"Authorization": f"Bearer {token_fantasma}"},
-    )
+def test_crear_con_cliente_inexistente_responde_404(client):
+    respuesta = client.post("/proyectos", json=cuerpo_proyecto(999999))
     assert respuesta.status_code == 404
     assert "no existe" in respuesta.json()["message"]
 
 
 def test_crear_con_url_invalida_responde_422(client, usuarios):
     cuerpo = cuerpo_proyecto(
-        tecnologia={"lenguaje_principal": "Python", "repositorio_url": "sin-esquema"}
+        usuarios["cliente"],
+        tecnologia={"lenguaje_principal": "Python", "repositorio_url": "sin-esquema"},
     )
-    respuesta = client.post("/proyectos", json=cuerpo, headers=auth(usuarios["cliente"]))
+    respuesta = client.post("/proyectos", json=cuerpo)
     assert respuesta.status_code == 422
 
 
-def test_crear_con_cuerpo_incompleto_responde_422(client, usuarios):
-    respuesta = client.post(
-        "/proyectos",
-        json={"nombre_proyecto": "Sin fecha"},
-        headers=auth(usuarios["cliente"]),
-    )
+def test_crear_con_cuerpo_incompleto_responde_422(client):
+    respuesta = client.post("/proyectos", json={"nombre_proyecto": "Sin fecha"})
     assert respuesta.status_code == 422
     assert respuesta.json()["status"] == "error"
     assert respuesta.json()["errors"][0]["tipo"] == "missing"
@@ -259,32 +213,10 @@ def test_crear_con_cuerpo_incompleto_responde_422(client, usuarios):
 def _proyecto_del_cliente(client, usuarios) -> int:
     respuesta = client.post(
         "/proyectos",
-        json=cuerpo_proyecto(nombre_proyecto="Proyecto a modificar"),
-        headers=auth(usuarios["cliente"]),
+        json=cuerpo_proyecto(usuarios["cliente"], nombre_proyecto="Proyecto a modificar"),
     )
     assert respuesta.status_code == 201
     return respuesta.json()["id"]
-
-
-def test_cliente_ajeno_no_puede_modificar(client, usuarios, otro_cliente):
-    proyecto_id = _proyecto_del_cliente(client, usuarios)
-    respuesta = client.patch(
-        f"/proyectos/{proyecto_id}",
-        json={"descripcion": "Intento ajeno"},
-        headers=auth(otro_cliente),
-    )
-    assert respuesta.status_code == 403
-    assert "propietario" in respuesta.json()["message"]
-
-
-def test_trabajador_no_puede_modificar(client, usuarios):
-    proyecto_id = _proyecto_del_cliente(client, usuarios)
-    respuesta = client.put(
-        f"/proyectos/{proyecto_id}",
-        json={"nombre_proyecto": "Nuevo", "descripcion": "x", "estado": "EN_CURSO"},
-        headers=auth(usuarios["trabajador"], "TRABAJADOR"),
-    )
-    assert respuesta.status_code == 403
 
 
 def test_put_con_nombre_null_responde_422(client, usuarios):
@@ -292,7 +224,6 @@ def test_put_con_nombre_null_responde_422(client, usuarios):
     respuesta = client.put(
         f"/proyectos/{proyecto_id}",
         json={"nombre_proyecto": None, "descripcion": "x", "estado": "EN_CURSO"},
-        headers=auth(usuarios["cliente"]),
     )
     assert respuesta.status_code == 422
     assert respuesta.json()["status"] == "error"
@@ -307,7 +238,6 @@ def test_put_reemplazo_completo(client, usuarios):
             "descripcion": "Descripcion nueva",
             "estado": "EN_CURSO",
         },
-        headers=auth(usuarios["cliente"]),
     )
     assert respuesta.status_code == 200
     dato = respuesta.json()
@@ -321,7 +251,6 @@ def test_put_incompleto_responde_422(client, usuarios):
     respuesta = client.put(
         f"/proyectos/{proyecto_id}",
         json={"nombre_proyecto": "Solo el nombre"},
-        headers=auth(usuarios["cliente"]),
     )
     assert respuesta.status_code == 422
 
@@ -331,7 +260,6 @@ def test_patch_parcial_correcto(client, usuarios):
     respuesta = client.patch(
         f"/proyectos/{proyecto_id}",
         json={"descripcion": "Solo cambia la descripcion"},
-        headers=auth(usuarios["cliente"]),
     )
     assert respuesta.status_code == 200
     dato = respuesta.json()
@@ -345,7 +273,6 @@ def test_patch_con_nombre_null_responde_422(client, usuarios):
     respuesta = client.patch(
         f"/proyectos/{proyecto_id}",
         json={"nombre_proyecto": None},
-        headers=auth(usuarios["cliente"]),
     )
     assert respuesta.status_code == 422
 
@@ -356,21 +283,18 @@ def test_transicion_de_estado_no_permitida_responde_409(client, usuarios):
     primero = client.patch(
         f"/proyectos/{proyecto_id}",
         json={"estado": "EN_CURSO"},
-        headers=auth(usuarios["cliente"]),
     )
     assert primero.status_code == 200
 
-    completado = client.patch(
+    finalizado = client.patch(
         f"/proyectos/{proyecto_id}",
-        json={"estado": "COMPLETADO"},
-        headers=auth(usuarios["cliente"]),
+        json={"estado": "FINALIZADO"},
     )
-    assert completado.status_code == 200
+    assert finalizado.status_code == 200
 
     reintento = client.patch(
         f"/proyectos/{proyecto_id}",
         json={"estado": "ABIERTO"},
-        headers=auth(usuarios["cliente"]),
     )
     assert reintento.status_code == 409
     assert "no permitido" in reintento.json()["message"]
@@ -385,15 +309,12 @@ def test_listar_con_filtros_y_paginacion(client, usuarios):
     for numero in range(2):
         respuesta = client.post(
             "/proyectos",
-            json=cuerpo_proyecto(nombre_proyecto=f"Proyecto paginado {numero}"),
-            headers=auth(cliente),
+            json=cuerpo_proyecto(cliente, nombre_proyecto=f"Proyecto paginado {numero}"),
         )
         assert respuesta.status_code == 201
         ids.append(respuesta.json()["id"])
 
-    primera = client.get(
-        f"/proyectos?cliente={cliente}&limit=1&offset=0", headers=auth(cliente)
-    )
+    primera = client.get(f"/proyectos?cliente={cliente}&limit=1&offset=0")
     assert primera.status_code == 200
     paginado = primera.json()
     assert paginado["total"] >= 2
@@ -401,34 +322,28 @@ def test_listar_con_filtros_y_paginacion(client, usuarios):
     assert paginado["offset"] == 0
     assert len(paginado["items"]) == 1
 
-    segunda = client.get(
-        f"/proyectos?cliente={cliente}&limit=1&offset=1", headers=auth(cliente)
-    )
+    segunda = client.get(f"/proyectos?cliente={cliente}&limit=1&offset=1")
     assert segunda.status_code == 200
     assert segunda.json()["items"][0]["id"] != paginado["items"][0]["id"]
 
-    por_categoria = client.get(
-        f"/proyectos?cliente={cliente}&categoria=TecnologiaYProgramacion", headers=auth(cliente)
-    )
-    assert por_categoria.status_code == 200
-    assert por_categoria.json()["total"] >= 2
-    assert all(i["categoria"] == "TecnologiaYProgramacion" for i in por_categoria.json()["items"])
+    por_tipo = client.get(f"/proyectos?cliente={cliente}&tipo=TECNOLOGIA")
+    assert por_tipo.status_code == 200
+    assert por_tipo.json()["total"] >= 2
+    assert all(i["tipo"] == "TECNOLOGIA" for i in por_tipo.json()["items"])
 
-    por_estado = client.get(f"/proyectos?cliente={cliente}&estado=ABIERTO", headers=auth(cliente))
+    por_estado = client.get(f"/proyectos?cliente={cliente}&estado=ABIERTO")
     assert por_estado.status_code == 200
     assert all(i["estado"] == "ABIERTO" for i in por_estado.json()["items"])
 
-    por_estado_ajeno = client.get(
-        f"/proyectos?cliente={cliente}&estado=ESTADO_INVENTADO", headers=auth(cliente)
-    )
+    por_estado_ajeno = client.get(f"/proyectos?cliente={cliente}&estado=ESTADO_INVENTADO")
     assert por_estado_ajeno.status_code == 422
 
     for identificador in ids:
-        client.delete(f"/proyectos/{identificador}", headers=auth(cliente))
+        client.delete(f"/proyectos/{identificador}")
 
 
-def test_proyecto_inexistente_responde_404(client, usuarios):
-    respuesta = client.get("/proyectos/999999", headers=auth(usuarios["cliente"]))
+def test_proyecto_inexistente_responde_404(client):
+    respuesta = client.get("/proyectos/999999")
     assert respuesta.status_code == 404
     assert respuesta.json() == {"status": "error", "message": "Proyecto no encontrado"}
 
@@ -438,10 +353,10 @@ def test_proyecto_inexistente_responde_404(client, usuarios):
 # ---------------------------------------------------------------------------
 def test_eliminar_proyecto_sin_asignaciones(client, usuarios):
     proyecto_id = _proyecto_del_cliente(client, usuarios)
-    borrado = client.delete(f"/proyectos/{proyecto_id}", headers=auth(usuarios["cliente"]))
+    borrado = client.delete(f"/proyectos/{proyecto_id}")
     assert borrado.status_code == 204
 
-    consulta = client.get(f"/proyectos/{proyecto_id}", headers=auth(usuarios["cliente"]))
+    consulta = client.get(f"/proyectos/{proyecto_id}")
     assert consulta.status_code == 404
 
 
@@ -451,7 +366,7 @@ def test_eliminar_proyecto_con_asignaciones_responde_409(client, usuarios):
     db = SessionLocal()
     db.add(
         Asignacion(
-            usuario_id=usuarios["trabajador"],
+            trabajador_id=usuarios["trabajador"],
             proyecto_id=proyecto_id,
             rol_en_proyecto="Desarrollador",
             tarifa_por_hora=25000,
@@ -460,12 +375,12 @@ def test_eliminar_proyecto_con_asignaciones_responde_409(client, usuarios):
     db.commit()
     db.close()
 
-    borrado = client.delete(f"/proyectos/{proyecto_id}", headers=auth(usuarios["cliente"]))
+    borrado = client.delete(f"/proyectos/{proyecto_id}")
     assert borrado.status_code == 409
     assert "asignacion" in borrado.json()["message"]
     assert "CANCELADO" in borrado.json()["message"]
 
-    consulta = client.get(f"/proyectos/{proyecto_id}", headers=auth(usuarios["cliente"]))
+    consulta = client.get(f"/proyectos/{proyecto_id}")
     assert consulta.status_code == 200, "el proyecto no debe haberse borrado"
 
 
@@ -474,7 +389,7 @@ def test_listar_asignaciones_del_proyecto(client, usuarios):
     db = SessionLocal()
     db.add(
         Asignacion(
-            usuario_id=usuarios["trabajador"],
+            trabajador_id=usuarios["trabajador"],
             proyecto_id=proyecto_id,
             rol_en_proyecto="QA",
             tarifa_por_hora=30000,
@@ -483,10 +398,11 @@ def test_listar_asignaciones_del_proyecto(client, usuarios):
     db.commit()
     db.close()
 
-    respuesta = client.get(f"/proyectos/{proyecto_id}/asignaciones", headers=auth(usuarios["cliente"]))
+    respuesta = client.get(f"/proyectos/{proyecto_id}/asignaciones")
     assert respuesta.status_code == 200
     assert len(respuesta.json()) == 1
     assert respuesta.json()[0]["rol_en_proyecto"] == "QA"
+    assert respuesta.json()[0]["trabajador_id"] == usuarios["trabajador"]
 
 
 # ---------------------------------------------------------------------------
@@ -497,17 +413,21 @@ def test_consultar_progreso(client, usuarios):
 
     db = SessionLocal()
     asignacion = Asignacion(
-        usuario_id=usuarios["trabajador"],
+        trabajador_id=usuarios["trabajador"],
         proyecto_id=proyecto_id,
         rol_en_proyecto="Desarrollador",
         tarifa_por_hora=50000,
     )
     db.add(asignacion)
     db.flush()
+    ahora = datetime.now(timezone.utc).replace(tzinfo=None)
     db.add(
         RegistroTiempo(
             asignacion_id=asignacion.id,
+            inicio=ahora - timedelta(hours=6),
+            fin=ahora - timedelta(hours=2),
             horas=4,
+            tarifa_aplicada=50000,
             origen="MANUAL",
             estado="APROBADO",
         )
@@ -515,7 +435,10 @@ def test_consultar_progreso(client, usuarios):
     db.add(
         RegistroTiempo(
             asignacion_id=asignacion.id,
+            inicio=ahora - timedelta(hours=2),
+            fin=ahora,
             horas=2,
+            tarifa_aplicada=None,
             origen="TEMPORIZADOR",
             estado="PENDIENTE",
         )
@@ -523,30 +446,30 @@ def test_consultar_progreso(client, usuarios):
     db.commit()
     db.close()
 
-    respuesta = client.get(f"/proyectos/{proyecto_id}/progreso", headers=auth(usuarios["cliente"]))
+    respuesta = client.get(f"/proyectos/{proyecto_id}/progreso")
     assert respuesta.status_code == 200
     dato = respuesta.json()
     assert dato["proyecto_id"] == proyecto_id
     assert dato["dias_activo"] >= 0
     assert float(dato["horas_aprobadas"]) == 4.0
     assert float(dato["horas_pendientes"]) == 2.0
+    assert float(dato["horas_congeladas"]) == 0.0
     assert dato["numero_asignaciones"] == 1
     assert float(dato["costo_acumulado"]) == 300000.0
-    assert dato["tipo_proyecto"] == "TecnologiaYProgramacion"
+    assert dato["tipo_proyecto"] == "TECNOLOGIA"
     assert dato["detalles_especialidad"]["lenguaje_principal"] == "Python"
 
 
 # ---------------------------------------------------------------------------
 # Postulaciones
 # ---------------------------------------------------------------------------
-def test_flujo_de_postulaciones(client, usuarios, otro_cliente):
+def test_flujo_de_postulaciones(client, usuarios):
     cliente = usuarios["cliente"]
     trabajador = usuarios["trabajador"]
 
     creacion = client.post(
         "/proyectos",
-        json=cuerpo_proyecto(nombre_proyecto="Proyecto con postulaciones"),
-        headers=auth(cliente),
+        json=cuerpo_proyecto(cliente, nombre_proyecto="Proyecto con postulaciones"),
     )
     assert creacion.status_code == 201
     proyecto_id = creacion.json()["id"]
@@ -554,35 +477,31 @@ def test_flujo_de_postulaciones(client, usuarios, otro_cliente):
     # 1. el trabajador se postula
     postulacion = client.post(
         f"/proyectos/{proyecto_id}/postulaciones",
-        json={"tarifa_por_hora": 45000, "mensaje": "Tengo experiencia"},
-        headers=auth(trabajador, "TRABAJADOR"),
+        json={"trabajador_id": trabajador, "tarifa_propuesta": 45000, "mensaje": "Tengo experiencia"},
     )
     assert postulacion.status_code == 201
     postulacion_id = postulacion.json()["id"]
     assert postulacion.json()["estado"] == "PENDIENTE"
+    assert postulacion.json()["trabajador_id"] == trabajador
+    assert float(postulacion.json()["tarifa_propuesta"]) == 45000.0
 
     # 2. no se puede postular dos veces
     duplicada = client.post(
         f"/proyectos/{proyecto_id}/postulaciones",
-        json={"tarifa_por_hora": 50000},
-        headers=auth(trabajador, "TRABAJADOR"),
+        json={"trabajador_id": trabajador, "tarifa_propuesta": 50000},
     )
     assert duplicada.status_code == 409
     assert "postulaste" in duplicada.json()["message"]
 
-    # 3. solo el cliente dueno ve las postulaciones
-    ajeno = client.get(f"/proyectos/{proyecto_id}/postulaciones", headers=auth(otro_cliente))
-    assert ajeno.status_code == 403
-
-    dueno = client.get(f"/proyectos/{proyecto_id}/postulaciones", headers=auth(cliente))
-    assert dueno.status_code == 200
-    assert len(dueno.json()) == 1
+    # 3. listar postulaciones
+    listado = client.get(f"/proyectos/{proyecto_id}/postulaciones")
+    assert listado.status_code == 200
+    assert len(listado.json()) == 1
 
     # 4. el cliente acepta
     aceptada = client.patch(
         f"/postulaciones/{postulacion_id}",
         json={"estado": "ACEPTADA"},
-        headers=auth(cliente),
     )
     assert aceptada.status_code == 200
     assert aceptada.json()["estado"] == "ACEPTADA"
@@ -591,7 +510,6 @@ def test_flujo_de_postulaciones(client, usuarios, otro_cliente):
     otra_vez = client.patch(
         f"/postulaciones/{postulacion_id}",
         json={"estado": "RECHAZADA"},
-        headers=auth(cliente),
     )
     assert otra_vez.status_code == 409
 
@@ -600,14 +518,12 @@ def test_flujo_de_postulaciones(client, usuarios, otro_cliente):
     try:
         segunda = client.post(
             f"/proyectos/{proyecto_id}/postulaciones",
-            json={"tarifa_por_hora": 60000},
-            headers=auth(segundo, "TRABAJADOR"),
+            json={"trabajador_id": segundo, "tarifa_propuesta": 60000},
         )
         assert segunda.status_code == 201
         rechazada = client.patch(
             f"/postulaciones/{segunda.json()['id']}",
             json={"estado": "RECHAZADA"},
-            headers=auth(cliente),
         )
         assert rechazada.status_code == 200
         assert rechazada.json()["estado"] == "RECHAZADA"
@@ -617,12 +533,11 @@ def test_flujo_de_postulaciones(client, usuarios, otro_cliente):
     # 7. un cliente no puede postularse como trabajador
     mala_rol = client.post(
         f"/proyectos/{proyecto_id}/postulaciones",
-        json={"tarifa_por_hora": 1000},
-        headers=auth(cliente, "CLIENTE"),
+        json={"trabajador_id": cliente, "tarifa_propuesta": 1000},
     )
-    assert mala_rol.status_code == 403
+    assert mala_rol.status_code == 404
 
-    client.delete(f"/proyectos/{proyecto_id}", headers=auth(cliente))
+    client.delete(f"/proyectos/{proyecto_id}")
 
 
 def test_no_se_puede_postular_a_proyecto_no_abierto(client, usuarios):
@@ -631,28 +546,25 @@ def test_no_se_puede_postular_a_proyecto_no_abierto(client, usuarios):
 
     creacion = client.post(
         "/proyectos",
-        json=cuerpo_proyecto(nombre_proyecto="Proyecto en curso"),
-        headers=auth(cliente),
+        json=cuerpo_proyecto(cliente, nombre_proyecto="Proyecto en curso"),
     )
     proyecto_id = creacion.json()["id"]
-    client.patch(f"/proyectos/{proyecto_id}", json={"estado": "EN_CURSO"}, headers=auth(cliente))
+    client.patch(f"/proyectos/{proyecto_id}", json={"estado": "EN_CURSO"})
 
     respuesta = client.post(
         f"/proyectos/{proyecto_id}/postulaciones",
-        json={"tarifa_por_hora": 10000},
-        headers=auth(trabajador, "TRABAJADOR"),
+        json={"trabajador_id": trabajador, "tarifa_propuesta": 10000},
     )
     assert respuesta.status_code == 409
     assert "ABIERTO" in respuesta.json()["message"]
 
-    client.delete(f"/proyectos/{proyecto_id}", headers=auth(cliente))
+    client.delete(f"/proyectos/{proyecto_id}")
 
 
 def test_postulacion_a_proyecto_inexistente(client, usuarios):
     respuesta = client.post(
         "/proyectos/999999/postulaciones",
-        json={"tarifa_por_hora": 10000},
-        headers=auth(usuarios["trabajador"], "TRABAJADOR"),
+        json={"trabajador_id": usuarios["trabajador"], "tarifa_propuesta": 10000},
     )
     assert respuesta.status_code == 404
 
@@ -660,11 +572,11 @@ def test_postulacion_a_proyecto_inexistente(client, usuarios):
 # ---------------------------------------------------------------------------
 # Errores con formato unico
 # ---------------------------------------------------------------------------
-def test_formato_de_error_unificado(client, usuarios):
-    respuesta = client.get("/proyectos/999999", headers=auth(usuarios["cliente"]))
+def test_formato_de_error_unificado(client):
+    respuesta = client.get("/proyectos/999999")
     assert set(respuesta.json().keys()) == {"status", "message"}
 
-    invalida = client.get("/proyectos?limit=0", headers=auth(usuarios["cliente"]))
+    invalida = client.get("/proyectos?limit=0")
     assert invalida.status_code == 422
     assert invalida.json()["status"] == "error"
     assert "errors" in invalida.json()

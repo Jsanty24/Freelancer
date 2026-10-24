@@ -75,13 +75,7 @@ def respuesta_error(status_code: int, description: str, mensaje: str) -> dict:
     }
 
 
-RESPUESTAS_AUTH = {
-    401: respuesta_error(401, "No autenticado", "Falta el token de autenticacion o el token ha expirado"),
-    403: respuesta_error(403, "Prohibido", "El rol autenticado no tiene permiso para esta operacion"),
-}
-
 RESPUESTAS_RECURSO = {
-    **RESPUESTAS_AUTH,
     404: respuesta_error(404, "No encontrado", "El recurso solicitado no existe"),
 }
 

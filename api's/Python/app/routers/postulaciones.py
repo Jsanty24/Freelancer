@@ -2,15 +2,13 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app import schemas
-from app.auth import UsuarioCliente, UsuarioTrabajador
 from app.database import get_db
-from app.errors import RESPUESTAS_AUTH, RESPUESTAS_RECURSO, respuesta_error
+from app.errors import RESPUESTAS_RECURSO, respuesta_error
 from app.services import postulaciones as servicio
 
 router = APIRouter(tags=["Postulaciones"])
 
 RESPUESTAS_POSTULAR = {
-    **RESPUESTAS_AUTH,
     404: respuesta_error(
         404, "No encontrado", "Proyecto inexistente o usuario no registrado como trabajador"
     ),
@@ -19,7 +17,9 @@ RESPUESTAS_POSTULAR = {
         "Conflicto",
         "El proyecto no esta ABIERTO o el trabajador ya se postulo a este proyecto",
     ),
-    422: respuesta_error(422, "Validacion", "tarifa_por_hora debe ser un numero mayor que 0"),
+    422: respuesta_error(
+        422, "Validacion", "trabajador_id y tarifa_propuesta deben ser numeros mayores que 0"
+    ),
 }
 
 RESPUESTAS_RESPONDER = {
@@ -39,14 +39,13 @@ RESPUESTAS_RESPONDER = {
 def crear_postulacion(
     proyecto_id: int,
     data: schemas.PostulacionCreate,
-    usuario: UsuarioTrabajador,
     db: Session = Depends(get_db),
 ):
-    """El trabajador autenticado se postula al proyecto con una tarifa propuesta.
+    """El trabajador (`trabajador_id` en el body) se postula al proyecto con una tarifa propuesta.
 
     Solo se puede postular a proyectos en estado ABIERTO y una sola vez por proyecto.
     """
-    return servicio.crear(db, usuario, proyecto_id, data)
+    return servicio.crear(db, proyecto_id, data)
 
 
 @router.get(
@@ -57,11 +56,10 @@ def crear_postulacion(
 )
 def listar_postulaciones(
     proyecto_id: int,
-    usuario: UsuarioCliente,
     db: Session = Depends(get_db),
 ):
-    """Devuelve las postulaciones recibidas por el proyecto. Solo su cliente propietario."""
-    return servicio.listar(db, usuario, proyecto_id)
+    """Devuelve las postulaciones recibidas por el proyecto."""
+    return servicio.listar(db, proyecto_id)
 
 
 @router.patch(
@@ -73,8 +71,7 @@ def listar_postulaciones(
 def responder_postulacion(
     postulacion_id: int,
     data: schemas.PostulacionRespuesta,
-    usuario: UsuarioCliente,
     db: Session = Depends(get_db),
 ):
-    """El cliente dueño del proyecto acepta o rechaza una postulacion pendiente."""
-    return servicio.responder(db, usuario, postulacion_id, data)
+    """Acepta o rechaza una postulacion pendiente."""
+    return servicio.responder(db, postulacion_id, data)

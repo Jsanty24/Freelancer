@@ -3,6 +3,7 @@ from decimal import Decimal
 from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import (
+    AliasChoices,
     AnyHttpUrl,
     BaseModel,
     ConfigDict,
@@ -14,12 +15,11 @@ from pydantic import (
 )
 
 from app.models import (
+    BLOQUE_POR_TIPO,
     ESTADO_PROYECTO_INICIAL,
-    BLOQUE_POR_CATEGORIA,
-    CategoriaProyecto,
     EstadoPostulacion,
     EstadoProyecto,
-    EstadoTiempo,
+    TipoProyecto,
 )
 
 MAX_NOMBRE = 150
@@ -27,7 +27,7 @@ LIMITE_INFERIOR_FECHA = date(2000, 1, 1)
 HORAS_SEMANALES_MAX = 168
 
 
-#Bloque de entrada
+# Bloque de entrada
 
 _VALIDADOR_URL = TypeAdapter(AnyHttpUrl)
 
@@ -45,9 +45,7 @@ class TecnologiaInput(BaseModel):
         try:
             _VALIDADOR_URL.validate_python(valor)
         except ValidationError as exc:
-            raise ValueError(
-                "Url"
-            ) from exc
+            raise ValueError("Url") from exc
         return valor
 
 
@@ -73,7 +71,7 @@ class AsistenciaInput(BaseModel):
     )
 
 
-#Bloque de salida
+# Bloque de salida
 
 class TecnologiaEspecificacion(BaseModel):
     lenguaje_principal: str
@@ -113,11 +111,18 @@ EspecificacionesProyecto = Union[
     GeneralEspecificacion,
 ]
 
-_CLAVES_CATEGORIA = tuple(BLOQUE_POR_CATEGORIA[c] for c in CategoriaProyecto)
+_CLAVES_CATEGORIA = tuple(BLOQUE_POR_TIPO[t] for t in TipoProyecto)
 
-#Proyecto Crea Asigna
+
+# Proyecto Crea / Actualiza
 
 class ProyectoCreate(BaseModel):
+    cliente_id: int = Field(
+        ...,
+        ge=1,
+        validation_alias=AliasChoices("cliente_id", "usuario_id"),
+        description="ID del cliente propietario del proyecto",
+    )
     nombre_proyecto: str = Field(..., min_length=1, max_length=MAX_NOMBRE)
     descripcion: Optional[str] = None
     fecha_inicio: date
@@ -159,10 +164,10 @@ class ProyectoCreate(BaseModel):
             )
         return self
 
-    def categoria_y_bloque(self):
-        for categoria, clave in BLOQUE_POR_CATEGORIA.items():
+    def tipo_y_bloque(self):
+        for tipo, clave in BLOQUE_POR_TIPO.items():
             if getattr(self, clave) is not None:
-                return categoria, clave
+                return tipo, clave
         return None, None
 
 
@@ -199,47 +204,48 @@ class ProyectoPatch(BaseModel):
             raise ValueError("nombre_proyecto no puede estar vacio")
         return valor
 
-# Responde
+
+# Respuestas
 
 class _ProyectoBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    usuario_id: int
+    cliente_id: int
     nombre_proyecto: str
     descripcion: Optional[str] = None
     fecha_inicio: date
+    tipo: TipoProyecto
     estado: EstadoProyecto
-    categoria: Optional[CategoriaProyecto] = None
 
 
 class ProyectoTecnologiaResponse(_ProyectoBase):
-    tipo_proyecto: Literal["TecnologiaYProgramacion"]
+    tipo_proyecto: Literal["TECNOLOGIA"]
     especificaciones: TecnologiaEspecificacion
 
 
 class ProyectoDisenoResponse(_ProyectoBase):
-    tipo_proyecto: Literal["DisenoYMultimedia"]
+    tipo_proyecto: Literal["DISENO"]
     especificaciones: DisenoEspecificacion
 
 
 class ProyectoRedaccionResponse(_ProyectoBase):
-    tipo_proyecto: Literal["RedaccionYContenido"]
+    tipo_proyecto: Literal["REDACCION"]
     especificaciones: RedaccionEspecificacion
 
 
 class ProyectoMarketingResponse(_ProyectoBase):
-    tipo_proyecto: Literal["MarketingDigitalYRedesSociales"]
+    tipo_proyecto: Literal["MARKETING"]
     especificaciones: MarketingEspecificacion
 
 
 class ProyectoAsistenciaResponse(_ProyectoBase):
-    tipo_proyecto: Literal["AsistenciaVirtualYAdministracion"]
+    tipo_proyecto: Literal["ASISTENCIA"]
     especificaciones: AsistenciaEspecificacion
 
 
 class ProyectoGeneralResponse(_ProyectoBase):
-    tipo_proyecto: Literal["General"]
+    tipo_proyecto: Literal["GENERAL"]
     especificaciones: GeneralEspecificacion
 
 
@@ -271,15 +277,16 @@ class ProgresoResponse(BaseModel):
     dias_activo: int
     horas_aprobadas: Decimal
     horas_pendientes: Decimal
+    horas_congeladas: Decimal
     numero_asignaciones: int
     costo_acumulado: Decimal
     tipo_proyecto: Literal[
-        "TecnologiaYProgramacion",
-        "DisenoYMultimedia",
-        "RedaccionYContenido",
-        "MarketingDigitalYRedesSociales",
-        "AsistenciaVirtualYAdministracion",
-        "General",
+        "TECNOLOGIA",
+        "DISENO",
+        "REDACCION",
+        "MARKETING",
+        "ASISTENCIA",
+        "GENERAL",
     ]
     detalles_especialidad: EspecificacionesProyecto
 
@@ -289,19 +296,29 @@ class AsignacionResponse(BaseModel):
 
     id: int
     proyecto_id: int
-    usuario_id: int
+    trabajador_id: int
     rol_en_proyecto: str
     tarifa_por_hora: Decimal
-    temporizador_activo: bool
-    estado_tiempo: EstadoTiempo
-    factura_id: Optional[int] = None
+    temporizador_inicio: Optional[datetime] = None
 
 
 # --------------------------------------------------------------------------
 # Postulaciones
 # --------------------------------------------------------------------------
 class PostulacionCreate(BaseModel):
-    tarifa_por_hora: Decimal = Field(..., gt=0, max_digits=10, decimal_places=2)
+    trabajador_id: int = Field(
+        ...,
+        ge=1,
+        validation_alias=AliasChoices("trabajador_id", "usuario_id"),
+        description="ID del trabajador que se postula",
+    )
+    tarifa_propuesta: Decimal = Field(
+        ...,
+        gt=0,
+        max_digits=10,
+        decimal_places=2,
+        validation_alias=AliasChoices("tarifa_propuesta", "tarifa_por_hora"),
+    )
     mensaje: Optional[str] = Field(default=None, max_length=1000)
 
 
@@ -314,8 +331,8 @@ class PostulacionResponse(BaseModel):
 
     id: int
     proyecto_id: int
-    usuario_id: int
-    tarifa_por_hora: Decimal
+    trabajador_id: int
+    tarifa_propuesta: Decimal
     mensaje: Optional[str] = None
     estado: EstadoPostulacion
     fecha_postulacion: datetime

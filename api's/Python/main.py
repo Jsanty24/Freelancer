@@ -1,12 +1,15 @@
+import hmac
 import logging
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 from app.database import SessionLocal
 from app.errors import ErrorAPI, registrar_manejadores
@@ -18,13 +21,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger("api_proyectos")
 
+INTERNAL_API_KEY = (
+    os.getenv("INTERNAL_API_KEY") or "clave-interna-gateway-freelancer-2026"
+).strip()
+
+RUTAS_PUBLICAS_INTERNAS = {"/", "/health", "/docs", "/redoc", "/openapi.json"}
+
 DESCRIPCION = (
     "API de proyectos de la plataforma Freelance. Administra proyectos, sus categorias, "
     "asignaciones y postulaciones sobre la base de datos `plataforma_freelance`.\n\n"
-    "**Autenticacion:** todas las rutas (excepto `/` y `/health`) exigen un token Bearer "
-    "JWT firmado con HS256 y el secreto compartido `JWT_SECRET`. El payload debe traer "
-    "`sub` (id del usuario), `rol` (`CLIENTE` o `TRABAJADOR`) y `exp`. "
-    "Pulsa **Authorize** para probar los endpoints.\n\n"
+    "**Seguridad interna:** este microservicio escucha en `127.0.0.1` y exige el header "
+    "`X-Internal-Key` enviado por el API Gateway.\n\n"
     "**Formato de error:** todas las respuestas de error usan el mismo formato que la API de "
     "usuarios: `{\"status\": \"error\", \"message\": \"...\"}` "
     "(422 agrega ademas el listado `errors`)."
@@ -64,6 +71,22 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def verificar_clave_interna(request: Request, call_next):
+    if request.method != "OPTIONS" and request.url.path not in RUTAS_PUBLICAS_INTERNAS:
+        clave_recibida = request.headers.get("X-Internal-Key") or ""
+        if not hmac.compare_digest(clave_recibida, INTERNAL_API_KEY):
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "status": "error",
+                    "message": "Acceso directo no permitido; use el API Gateway",
+                },
+            )
+    return await call_next(request)
+
 
 registrar_manejadores(app)
 app.include_router(proyectos.router)
@@ -105,5 +128,5 @@ def health():
 if __name__ == "__main__":
     import uvicorn
 
-    logger.info("Arrancando API Proyectos en el puerto %s (variable PORT del .env)", PORT)
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    logger.info("Arrancando API Proyectos en 127.0.0.1:%s (solo acceso local / Gateway)", PORT)
+    uvicorn.run(app, host="127.0.0.1", port=PORT)

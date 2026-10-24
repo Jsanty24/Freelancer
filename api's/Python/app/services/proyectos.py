@@ -7,7 +7,6 @@ from sqlalchemy import case, func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
-from app.auth import UsuarioToken
 from app.errors import ErrorAPI
 from app.models import (
     Asignacion,
@@ -22,6 +21,7 @@ from app.models import (
     ProyectoTecnologia,
     RegistroTiempo,
     TRANSICIONES_ESTADO_PROYECTO,
+    TipoProyecto,
     Usuario,
 )
 from app.schemas import ProyectoCreate, ProyectoPatch, ProyectoUpdate
@@ -45,10 +45,10 @@ _MODELOS_DETALLE = {
 }
 
 
-def _categoria_y_specs(proyecto: Proyecto):
+def _tipo_y_specs(proyecto: Proyecto):
     if proyecto.tecnologia:
         return (
-            "TecnologiaYProgramacion",
+            "TECNOLOGIA",
             {
                 "lenguaje_principal": proyecto.tecnologia.lenguaje_principal,
                 "repositorio_url": proyecto.tecnologia.repositorio_url,
@@ -56,7 +56,7 @@ def _categoria_y_specs(proyecto: Proyecto):
         )
     if proyecto.diseno:
         return (
-            "DisenoYMultimedia",
+            "DISENO",
             {
                 "software_utilizado": proyecto.diseno.software_utilizado,
                 "formato_entrega": proyecto.diseno.formato_entrega,
@@ -64,7 +64,7 @@ def _categoria_y_specs(proyecto: Proyecto):
         )
     if proyecto.redaccion:
         return (
-            "RedaccionYContenido",
+            "REDACCION",
             {
                 "cantidad_palabras": proyecto.redaccion.cantidad_palabras,
                 "idioma": proyecto.redaccion.idioma,
@@ -72,7 +72,7 @@ def _categoria_y_specs(proyecto: Proyecto):
         )
     if proyecto.marketing:
         return (
-            "MarketingDigitalYRedesSociales",
+            "MARKETING",
             {
                 "plataforma_objetivo": proyecto.marketing.plataforma_objetivo,
                 "tipo_campana": proyecto.marketing.tipo_campana,
@@ -80,25 +80,26 @@ def _categoria_y_specs(proyecto: Proyecto):
         )
     if proyecto.asistencia:
         return (
-            "AsistenciaVirtualYAdministracion",
+            "ASISTENCIA",
             {
                 "herramientas_manejo": proyecto.asistencia.herramientas_manejo,
                 "horas_semanales_requeridas": proyecto.asistencia.horas_semanales_requeridas,
             },
         )
-    return "General", {}
+    tipo_str = proyecto.tipo.value if isinstance(proyecto.tipo, TipoProyecto) else str(proyecto.tipo or "GENERAL")
+    return tipo_str, {}
 
 
 def serializar(proyecto: Proyecto) -> dict:
-    tipo_proyecto, especificaciones = _categoria_y_specs(proyecto)
+    tipo_proyecto, especificaciones = _tipo_y_specs(proyecto)
     return {
         "id": proyecto.id,
-        "usuario_id": proyecto.usuario_id,
+        "cliente_id": proyecto.cliente_id,
         "nombre_proyecto": proyecto.nombre_proyecto,
         "descripcion": proyecto.descripcion,
         "fecha_inicio": proyecto.fecha_inicio,
+        "tipo": proyecto.tipo,
         "estado": proyecto.estado,
-        "categoria": proyecto.categoria,
         "tipo_proyecto": tipo_proyecto,
         "especificaciones": especificaciones,
     }
@@ -113,16 +114,11 @@ def buscar_o_404(db: Session, proyecto_id: int) -> Proyecto:
     return proyecto
 
 
-def _exigir_propietario(proyecto: Proyecto, usuario: UsuarioToken) -> None:
-    if proyecto.usuario_id != usuario.id:
-        raise ErrorAPI(403, "No eres el cliente propietario de este proyecto")
-
-
-def _exigir_cliente(db: Session, usuario: UsuarioToken) -> None:
-    if db.get(Cliente, usuario.id) is None:
-        if db.get(Usuario, usuario.id) is None:
-            raise ErrorAPI(404, "El usuario autenticado no existe")
-        raise ErrorAPI(404, "El usuario autenticado no esta registrado como cliente")
+def _exigir_cliente(db: Session, cliente_id: int) -> None:
+    if db.get(Cliente, cliente_id) is None:
+        if db.get(Usuario, cliente_id) is None:
+            raise ErrorAPI(404, "El cliente indicado no existe")
+        raise ErrorAPI(404, "El usuario indicado no esta registrado como cliente")
 
 
 def _exigir_transicion(actual, nuevo) -> None:
@@ -140,33 +136,33 @@ def _exigir_transicion(actual, nuevo) -> None:
         )
 
 
-def crear(db: Session, usuario: UsuarioToken, data: ProyectoCreate) -> dict:
-    _exigir_cliente(db, usuario)
-    categoria, bloque = data.categoria_y_bloque()
+def crear(db: Session, data: ProyectoCreate) -> dict:
+    _exigir_cliente(db, data.cliente_id)
+    tipo, bloque = data.tipo_y_bloque()
 
     try:
         proyecto = Proyecto(
-            usuario_id=usuario.id,
+            cliente_id=data.cliente_id,
             nombre_proyecto=data.nombre_proyecto,
             descripcion=data.descripcion,
             fecha_inicio=data.fecha_inicio,
+            tipo=tipo,
             estado=data.estado,
-            categoria=categoria,
         )
         db.add(proyecto)
         db.flush()
 
         detalle = getattr(data, bloque)
         modelo_detalle = _MODELOS_DETALLE[bloque]
-        db.add(modelo_detalle(proyecto_id=proyecto.id, **detalle.model_dump()))
+        db.add(modelo_detalle(proyecto_id=proyecto.id, tipo=tipo, **detalle.model_dump()))
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        logger.warning("Violacion de integridad al crear proyecto del usuario %s: %s", usuario.id, exc)
+        logger.warning("Violacion de integridad al crear proyecto del cliente %s: %s", data.cliente_id, exc)
         raise ErrorAPI(409, "No se pudo crear el proyecto por una violacion de integridad de datos") from exc
     except SQLAlchemyError as exc:
         db.rollback()
-        logger.exception("Error de base de datos al crear proyecto del usuario %s", usuario.id)
+        logger.exception("Error de base de datos al crear proyecto del cliente %s", data.cliente_id)
         raise ErrorAPI(500, "Error interno al crear el proyecto") from exc
 
     db.refresh(proyecto)
@@ -178,7 +174,7 @@ def listar(
     *,
     estado: Optional[EstadoProyecto] = None,
     cliente: Optional[int] = None,
-    categoria=None,
+    tipo: Optional[TipoProyecto] = None,
     limit: int = 50,
     offset: int = 0,
 ) -> dict:
@@ -186,9 +182,9 @@ def listar(
     if estado is not None:
         consulta = consulta.filter(Proyecto.estado == estado)
     if cliente is not None:
-        consulta = consulta.filter(Proyecto.usuario_id == cliente)
-    if categoria is not None:
-        consulta = consulta.filter(Proyecto.categoria == categoria)
+        consulta = consulta.filter(Proyecto.cliente_id == cliente)
+    if tipo is not None:
+        consulta = consulta.filter(Proyecto.tipo == tipo)
 
     total = consulta.count()
     proyectos = consulta.order_by(Proyecto.id.desc()).offset(offset).limit(limit).all()
@@ -207,13 +203,11 @@ def obtener(db: Session, proyecto_id: int) -> dict:
 def actualizar(
     db: Session,
     proyecto_id: int,
-    usuario: UsuarioToken,
     data: ProyectoUpdate | ProyectoPatch,
     *,
     parcial: bool,
 ) -> dict:
     proyecto = buscar_o_404(db, proyecto_id)
-    _exigir_propietario(proyecto, usuario)
 
     campos = data.model_dump(exclude_unset=True) if parcial else data.model_dump()
     if "estado" in campos:
@@ -236,9 +230,8 @@ def actualizar(
     return serializar(proyecto)
 
 
-def eliminar(db: Session, proyecto_id: int, usuario: UsuarioToken) -> None:
+def eliminar(db: Session, proyecto_id: int) -> None:
     proyecto = buscar_o_404(db, proyecto_id)
-    _exigir_propietario(proyecto, usuario)
 
     total_asignaciones = (
         db.query(func.count(Asignacion.id)).filter(Asignacion.proyecto_id == proyecto.id).scalar()
@@ -281,7 +274,7 @@ def asignaciones(db: Session, proyecto_id: int) -> list[Asignacion]:
 def progreso(db: Session, proyecto_id: int) -> dict:
     proyecto = buscar_o_404(db, proyecto_id)
 
-    horas_aprobadas, horas_pendientes, costo = (
+    horas_aprobadas, horas_pendientes, horas_congeladas, costo = (
         db.query(
             func.coalesce(
                 func.sum(
@@ -295,7 +288,19 @@ def progreso(db: Session, proyecto_id: int) -> dict:
                 ),
                 0,
             ),
-            func.coalesce(func.sum(RegistroTiempo.horas * Asignacion.tarifa_por_hora), 0),
+            func.coalesce(
+                func.sum(
+                    case((RegistroTiempo.estado == EstadoTiempo.CONGELADO, RegistroTiempo.horas), else_=0)
+                ),
+                0,
+            ),
+            func.coalesce(
+                func.sum(
+                    RegistroTiempo.horas
+                    * func.coalesce(RegistroTiempo.tarifa_aplicada, Asignacion.tarifa_por_hora)
+                ),
+                0,
+            ),
         )
         .select_from(RegistroTiempo)
         .join(Asignacion, RegistroTiempo.asignacion_id == Asignacion.id)
@@ -308,7 +313,7 @@ def progreso(db: Session, proyecto_id: int) -> dict:
         or 0
     )
     dias = (date.today() - proyecto.fecha_inicio).days
-    tipo_proyecto, especificaciones = _categoria_y_specs(proyecto)
+    tipo_proyecto, especificaciones = _tipo_y_specs(proyecto)
 
     return {
         "proyecto_id": proyecto.id,
@@ -318,6 +323,7 @@ def progreso(db: Session, proyecto_id: int) -> dict:
         "dias_activo": max(0, dias),
         "horas_aprobadas": Decimal(horas_aprobadas).quantize(Decimal("0.01")),
         "horas_pendientes": Decimal(horas_pendientes).quantize(Decimal("0.01")),
+        "horas_congeladas": Decimal(horas_congeladas).quantize(Decimal("0.01")),
         "numero_asignaciones": int(total_asignaciones),
         "costo_acumulado": Decimal(costo).quantize(Decimal("0.01")),
         "tipo_proyecto": tipo_proyecto,
