@@ -19,7 +19,8 @@ class TrabajadorController {
 
         if ($id !== null) {
             $stmt = $this->db->prepare(
-                "SELECT t.usuario_id, u.nombre, u.email, t.especialidad, t.disponibilidad
+                "SELECT t.usuario_id, u.nombre, u.email, u.telefono, u.rol, u.fecha_registro,
+                        t.especialidad, t.disponibilidad
                  FROM trabajadores t
                  INNER JOIN usuarios u ON u.id = t.usuario_id
                  WHERE t.usuario_id = :id"
@@ -37,7 +38,8 @@ class TrabajadorController {
             }
         } else {
             $stmt = $this->db->prepare(
-                "SELECT t.usuario_id, u.nombre, u.email, t.especialidad, t.disponibilidad
+                "SELECT t.usuario_id, u.nombre, u.email, u.telefono, u.rol, u.fecha_registro,
+                        t.especialidad, t.disponibilidad
                  FROM trabajadores t
                  INNER JOIN usuarios u ON u.id = t.usuario_id
                  ORDER BY t.usuario_id ASC"
@@ -51,7 +53,7 @@ class TrabajadorController {
     }
 
     public function create(): void {
-        $data = json_decode(file_get_contents("php://input"), true);
+        $data = json_decode(file_get_contents("php://input"), true) ?? [];
 
         if (
             !isset($data['usuario_id']) || !ctype_digit((string) $data['usuario_id']) ||
@@ -74,9 +76,16 @@ class TrabajadorController {
 
         $usuarioId = (int) $data['usuario_id'];
 
-        if (!$this->usuarioExiste($usuarioId)) {
+        $rolUsuario = $this->obtenerRolUsuario($usuarioId);
+        if ($rolUsuario === null) {
             http_response_code(404);
             echo json_encode(["status" => "error", "message" => "El usuario indicado no existe"]);
+            return;
+        }
+
+        if ($rolUsuario !== 'TRABAJADOR') {
+            http_response_code(409);
+            echo json_encode(["status" => "error", "message" => "El usuario no tiene rol TRABAJADOR"]);
             return;
         }
 
@@ -103,13 +112,18 @@ class TrabajadorController {
                 "id_creado" => $usuarioId
             ]);
         } catch (PDOException $e) {
-            http_response_code(500);
-            echo json_encode(["status" => "error", "message" => "Error al guardar el trabajador"]);
+            if ($e->getCode() === '45000') {
+                http_response_code(409);
+                echo json_encode(["status" => "error", "message" => "El usuario no tiene rol TRABAJADOR"]);
+            } else {
+                http_response_code(500);
+                echo json_encode(["status" => "error", "message" => "Error al guardar el trabajador"]);
+            }
         }
     }
 
     public function updateFull(int $id): void {
-        $data = json_decode(file_get_contents("php://input"), true);
+        $data = json_decode(file_get_contents("php://input"), true) ?? [];
 
         if (empty($data['especialidad']) || !array_key_exists('disponibilidad', $data)) {
             http_response_code(400);
@@ -149,7 +163,7 @@ class TrabajadorController {
     }
 
     public function updatePartial(int $id): void {
-        $data = json_decode(file_get_contents("php://input"), true);
+        $data = json_decode(file_get_contents("php://input"), true) ?? [];
 
         $sets = [];
         $valores = [];
@@ -215,7 +229,7 @@ class TrabajadorController {
         } catch (PDOException $e) {
             if ($e->getCode() === '23000') {
                 http_response_code(409);
-                echo json_encode(["status" => "error", "message" => "No se puede eliminar: el trabajador tiene asignaciones asociadas"]);
+                echo json_encode(["status" => "error", "message" => "No se puede eliminar: el trabajador tiene asignaciones o facturas asociadas"]);
             } else {
                 http_response_code(500);
                 echo json_encode(["status" => "error", "message" => "Error al eliminar el trabajador"]);
@@ -235,10 +249,11 @@ class TrabajadorController {
         return (bool) $stmt->fetch();
     }
 
-    private function usuarioExiste(int $id): bool {
-        $stmt = $this->db->prepare("SELECT id FROM usuarios WHERE id = :id");
+    private function obtenerRolUsuario(int $id): ?string {
+        $stmt = $this->db->prepare("SELECT rol FROM usuarios WHERE id = :id");
         $stmt->bindParam(':id', $id, PDO::PARAM_INT);
         $stmt->execute();
-        return (bool) $stmt->fetch();
+        $fila = $stmt->fetch();
+        return $fila ? (string) $fila['rol'] : null;
     }
 }

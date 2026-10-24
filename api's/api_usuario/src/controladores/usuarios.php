@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../config/conexion.php';
 
 class UsuarioController {
     private ?PDO $db;
+    private const ROLES_VALIDOS = ['CLIENTE', 'TRABAJADOR'];
 
     public function __construct() {
         $database = new Database();
@@ -18,7 +19,9 @@ class UsuarioController {
         }
 
         if ($id !== null) {
-            $stmt = $this->db->prepare("SELECT id, nombre, email, telefono FROM usuarios WHERE id = :id");
+            $stmt = $this->db->prepare(
+                "SELECT id, nombre, email, telefono, rol, fecha_registro FROM usuarios WHERE id = :id"
+            );
             $stmt->bindParam(':id', $id, PDO::PARAM_INT);
             $stmt->execute();
             $usuario = $stmt->fetch();
@@ -31,7 +34,9 @@ class UsuarioController {
                 echo json_encode(["status" => "error", "message" => "Usuario no encontrado"]);
             }
         } else {
-            $stmt = $this->db->prepare("SELECT id, nombre, email, telefono FROM usuarios ORDER BY id ASC");
+            $stmt = $this->db->prepare(
+                "SELECT id, nombre, email, telefono, rol, fecha_registro FROM usuarios ORDER BY id ASC"
+            );
             $stmt->execute();
             $usuarios = $stmt->fetchAll();
 
@@ -39,12 +44,19 @@ class UsuarioController {
             echo json_encode(["status" => "success", "data" => $usuarios]);
         }
     }
-    public function create(): void {
-        $data = json_decode(file_get_contents("php://input"), true);
 
-        if (empty($data['nombre']) || empty($data['email'])) {
+    public function create(): void {
+        $data = json_decode(file_get_contents("php://input"), true) ?? [];
+
+        $passwordRaw = $data['password'] ?? $data['password_hash'] ?? '';
+        $rol = isset($data['rol']) ? strtoupper(trim((string) $data['rol'])) : '';
+
+        if (empty($data['nombre']) || empty($data['email']) || empty($passwordRaw) || empty($rol)) {
             http_response_code(400);
-            echo json_encode(["status" => "error", "message" => "Los campos 'nombre' y 'email' son obligatorios"]);
+            echo json_encode([
+                "status" => "error",
+                "message" => "Los campos 'nombre', 'email', 'password' (o 'password_hash') y 'rol' son obligatorios"
+            ]);
             return;
         }
 
@@ -54,22 +66,37 @@ class UsuarioController {
             return;
         }
 
+        if (!in_array($rol, self::ROLES_VALIDOS, true)) {
+            http_response_code(400);
+            echo json_encode([
+                "status" => "error",
+                "message" => "El campo 'rol' debe ser 'CLIENTE' o 'TRABAJADOR'"
+            ]);
+            return;
+        }
+
         $telefono = $data['telefono'] ?? null;
+        $passwordHash = !empty($data['password'])
+            ? password_hash((string) $data['password'], PASSWORD_BCRYPT)
+            : (string) $data['password_hash'];
 
         try {
             $stmt = $this->db->prepare(
-                "INSERT INTO usuarios (nombre, email, telefono) VALUES (:nombre, :email, :telefono)"
+                "INSERT INTO usuarios (nombre, email, telefono, password_hash, rol)
+                 VALUES (:nombre, :email, :telefono, :password_hash, :rol)"
             );
             $stmt->bindParam(':nombre', $data['nombre'], PDO::PARAM_STR);
             $stmt->bindParam(':email', $data['email'], PDO::PARAM_STR);
             $stmt->bindParam(':telefono', $telefono, PDO::PARAM_STR);
+            $stmt->bindParam(':password_hash', $passwordHash, PDO::PARAM_STR);
+            $stmt->bindParam(':rol', $rol, PDO::PARAM_STR);
             $stmt->execute();
 
             http_response_code(201);
             echo json_encode([
                 "status" => "success",
                 "message" => "Usuario registrado correctamente",
-                "id_creado" => $this->db->lastInsertId()
+                "id_creado" => (int) $this->db->lastInsertId()
             ]);
         } catch (PDOException $e) {
             if ($e->getCode() === '23000') {
@@ -81,18 +108,33 @@ class UsuarioController {
             }
         }
     }
-    public function updateFull(int $id): void {
-        $data = json_decode(file_get_contents("php://input"), true);
 
-        if (empty($data['nombre']) || empty($data['email'])) {
+    public function updateFull(int $id): void {
+        $data = json_decode(file_get_contents("php://input"), true) ?? [];
+
+        $rol = isset($data['rol']) ? strtoupper(trim((string) $data['rol'])) : '';
+
+        if (empty($data['nombre']) || empty($data['email']) || empty($rol)) {
             http_response_code(400);
-            echo json_encode(["status" => "error", "message" => "PUT requiere 'nombre' y 'email'"]);
+            echo json_encode([
+                "status" => "error",
+                "message" => "PUT requiere 'nombre', 'email' y 'rol'"
+            ]);
             return;
         }
 
         if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
             http_response_code(400);
             echo json_encode(["status" => "error", "message" => "El email no es válido"]);
+            return;
+        }
+
+        if (!in_array($rol, self::ROLES_VALIDOS, true)) {
+            http_response_code(400);
+            echo json_encode([
+                "status" => "error",
+                "message" => "El campo 'rol' debe ser 'CLIENTE' o 'TRABAJADOR'"
+            ]);
             return;
         }
 
@@ -105,19 +147,39 @@ class UsuarioController {
         $telefono = $data['telefono'] ?? null;
 
         try {
-            $stmt = $this->db->prepare(
-                "UPDATE usuarios SET nombre = :nombre, email = :email, telefono = :telefono WHERE id = :id"
-            );
+            if (!empty($data['password']) || !empty($data['password_hash'])) {
+                $passwordHash = !empty($data['password'])
+                    ? password_hash((string) $data['password'], PASSWORD_BCRYPT)
+                    : (string) $data['password_hash'];
+
+                $stmt = $this->db->prepare(
+                    "UPDATE usuarios
+                     SET nombre = :nombre, email = :email, telefono = :telefono, rol = :rol, password_hash = :password_hash
+                     WHERE id = :id"
+                );
+                $stmt->bindParam(':password_hash', $passwordHash, PDO::PARAM_STR);
+            } else {
+                $stmt = $this->db->prepare(
+                    "UPDATE usuarios
+                     SET nombre = :nombre, email = :email, telefono = :telefono, rol = :rol
+                     WHERE id = :id"
+                );
+            }
+
             $stmt->bindParam(':id', $id, PDO::PARAM_INT);
             $stmt->bindParam(':nombre', $data['nombre'], PDO::PARAM_STR);
             $stmt->bindParam(':email', $data['email'], PDO::PARAM_STR);
             $stmt->bindParam(':telefono', $telefono, PDO::PARAM_STR);
+            $stmt->bindParam(':rol', $rol, PDO::PARAM_STR);
             $stmt->execute();
 
             http_response_code(200);
             echo json_encode(["status" => "success", "message" => "Usuario actualizado (PUT)"]);
         } catch (PDOException $e) {
-            if ($e->getCode() === '23000') {
+            if ($e->getCode() === '45000') {
+                http_response_code(409);
+                echo json_encode(["status" => "error", "message" => "No se puede cambiar el rol de un usuario con perfil creado"]);
+            } elseif ($e->getCode() === '23000') {
                 http_response_code(409);
                 echo json_encode(["status" => "error", "message" => "Ya existe un usuario con ese email"]);
             } else {
@@ -128,21 +190,46 @@ class UsuarioController {
     }
 
     public function updatePartial(int $id): void {
-        $data = json_decode(file_get_contents("php://input"), true);
+        $data = json_decode(file_get_contents("php://input"), true) ?? [];
 
         $sets = [];
         $valores = [];
 
         foreach (['nombre', 'email', 'telefono'] as $campo) {
-            if (isset($data[$campo])) {
+            if (array_key_exists($campo, $data)) {
                 $sets[] = "$campo = :$campo";
                 $valores[":$campo"] = $data[$campo];
             }
         }
 
+        if (isset($data['rol'])) {
+            $rol = strtoupper(trim((string) $data['rol']));
+            if (!in_array($rol, self::ROLES_VALIDOS, true)) {
+                http_response_code(400);
+                echo json_encode([
+                    "status" => "error",
+                    "message" => "El campo 'rol' debe ser 'CLIENTE' o 'TRABAJADOR'"
+                ]);
+                return;
+            }
+            $sets[] = "rol = :rol";
+            $valores[':rol'] = $rol;
+        }
+
+        if (!empty($data['password']) || !empty($data['password_hash'])) {
+            $passwordHash = !empty($data['password'])
+                ? password_hash((string) $data['password'], PASSWORD_BCRYPT)
+                : (string) $data['password_hash'];
+            $sets[] = "password_hash = :password_hash";
+            $valores[':password_hash'] = $passwordHash;
+        }
+
         if (empty($sets)) {
             http_response_code(400);
-            echo json_encode(["status" => "error", "message" => "Envía al menos un campo: nombre, email o telefono"]);
+            echo json_encode([
+                "status" => "error",
+                "message" => "Envía al menos un campo: nombre, email, telefono, rol o password"
+            ]);
             return;
         }
 
@@ -170,7 +257,10 @@ class UsuarioController {
             http_response_code(200);
             echo json_encode(["status" => "success", "message" => "Usuario modificado (PATCH)"]);
         } catch (PDOException $e) {
-            if ($e->getCode() === '23000') {
+            if ($e->getCode() === '45000') {
+                http_response_code(409);
+                echo json_encode(["status" => "error", "message" => "No se puede cambiar el rol de un usuario con perfil creado"]);
+            } elseif ($e->getCode() === '23000') {
                 http_response_code(409);
                 echo json_encode(["status" => "error", "message" => "Ya existe un usuario con ese email"]);
             } else {

@@ -1,9 +1,11 @@
 <?php
 
+require_once __DIR__ . '/baseDatos/bd.php';
+
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Internal-Key");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
@@ -11,9 +13,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 $rutas = [
-    'usuarios'     => ['Usuarios.php', 'UsuarioController'],
-    'clientes'     => ['Clientes.php', 'ClienteController'],
-    'trabajadores' => ['Trabajadores.php', 'TrabajadorController'],
+    'login'        => ['login.php', 'LoginController'],
+    'usuarios'     => ['usuarios.php', 'UsuarioController'],
+    'clientes'     => ['clientes.php', 'ClienteController'],
+    'trabajadores' => ['trabajadores.php', 'TrabajadorController'],
 ];
 
 function responder(int $codigo, array $cuerpo): void {
@@ -30,6 +33,18 @@ try {
     $partes = $url === '' ? [] : explode('/', $url);
     $recurso = $partes[0] ?? '';
     $id = null;
+
+    if ($recurso === 'health') {
+        responder(200, ["status" => "ok", "service" => "API Usuarios (PHP)"]);
+    }
+
+    $internalKey = $_SERVER['HTTP_X_INTERNAL_KEY'] ?? '';
+    if (!hash_equals(INTERNAL_API_KEY, (string) $internalKey)) {
+        responder(403, [
+            "status" => "error",
+            "message" => "Acceso directo no permitido; use el API Gateway"
+        ]);
+    }
 
     if (isset($partes[1])) {
         if (!ctype_digit($partes[1])) {
