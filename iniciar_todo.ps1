@@ -1,19 +1,14 @@
-# ============================================================================
-# VettedWorks — Script de Inicio Unificado (4 APIs + Frontend Stitch)
-# ============================================================================
-# Inicia en ventanas/procesos separados:
 #   1. API 1 — PHP (Usuarios, Clientes, Trabajadores, Login) -> 127.0.0.1:8000
 #   2. API 2 — Python FastAPI (Proyectos y Postulaciones)    -> 127.0.0.1:5000
 #   3. API 3 — Node.js Express (Asignaciones, Horas, Facturas) -> 127.0.0.1:3000
 #   4. API 4 — Node.js API Gateway + Frontend Stitch         -> http://localhost:4000
-# ============================================================================
 
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Env:INTERNAL_API_KEY = "clave-interna-gateway-freelancer-2026"
 
-Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host " Iniciando Ecosistema VettedWorks (4 APIs + Frontend)" -ForegroundColor Cyan
-Write-Host "==========================================================" -ForegroundColor Cyan
+Write-Host -ForegroundColor Cyan
+Write-Host -ForegroundColor Cyan
+Write-Host -ForegroundColor Cyan
 
 # 1. API PHP (127.0.0.1:8000)
 $PhpExe = if (Test-Path "C:\xampp\php\php.exe") { "C:\xampp\php\php.exe" } else { "php" }
@@ -39,7 +34,7 @@ Start-Process -FilePath "node" -ArgumentList "index.js" -WorkingDirectory $Gatew
 
 Start-Sleep -Seconds 2
 Write-Host ""
-Write-Host "¡Listo! Todos los servicios están activos:" -ForegroundColor Yellow
+Write-Host "Todos los servicios están activos:" -ForegroundColor Yellow
 Write-Host " -> Frontend Hub & Stitch : http://localhost:4000/app/index.html" -ForegroundColor White
 Write-Host " -> Salud del Gateway     : http://localhost:4000/health" -ForegroundColor White
 Start-Process "http://localhost:4000/app/index.html"
