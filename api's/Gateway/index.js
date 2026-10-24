@@ -8,7 +8,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Servir el Frontend de Stitch directamente desde el Gateway en /app
 const FRONTEND_DIR = path.resolve(__dirname, '../../Frontend');
 app.use('/app', express.static(FRONTEND_DIR));
 app.get('/', (req, res) => {
@@ -23,9 +22,6 @@ const INTERNAL_API_KEY = (process.env.INTERNAL_API_KEY || 'clave-interna-gateway
 const JWT_SECRET = (process.env.JWT_SECRET || 'ZpRMXodtzvxILFzn0zjkmwTG4i7YCj1PkWFUql--Gg6lwpWdJMD3j8vjuhDm6us6').trim();
 const JWT_EXPIRES_SECONDS = Number(process.env.JWT_EXPIRES_SECONDS) || 86400;
 
-// =========================================================================
-// UTILIDADES JWT (HS256 NATIVO CON CRYPTO)
-// =========================================================================
 function base64UrlEncode(strOrBuffer) {
     return Buffer.from(strOrBuffer)
         .toString('base64')
@@ -87,9 +83,6 @@ function verificarJWT(token) {
     return payload;
 }
 
-// =========================================================================
-// MIDDLEWARE DE SESIÓN JWT
-// =========================================================================
 app.use((req, res, next) => {
     const authHeader = req.header('Authorization') || '';
     if (authHeader.toLowerCase().startsWith('bearer ')) {
@@ -122,9 +115,6 @@ function exigirAutenticacion(req, res, next) {
     next();
 }
 
-// =========================================================================
-// CLIENTE HTTP INTERNO HACIA LOS 3 MICROSERVICIOS (CON X-Internal-Key)
-// =========================================================================
 async function llamarMicroservicio(baseUrl, method, pathConQuery, body = undefined) {
     const url = `${baseUrl}${pathConQuery.startsWith('/') ? pathConQuery : '/' + pathConQuery}`;
     const opciones = {
@@ -173,9 +163,6 @@ async function reenviarA(baseUrl, req, res, bodyOverride = undefined) {
     }
 }
 
-// =========================================================================
-// ESTADO Y SALUD DEL GATEWAY Y MICROSERVICIOS
-// =========================================================================
 app.get('/', (req, res) => {
     res.json({
         status: 'ok',
@@ -216,9 +203,6 @@ app.get('/health', async (req, res) => {
     });
 });
 
-// =========================================================================
-// AUTENTICACIÓN Y REGISTRO ORQUESTADO (/auth/login, /auth/registro, /auth/me)
-// =========================================================================
 async function manejarLogin(req, res) {
     try {
         const respuestaLogin = await llamarMicroservicio(PHP_API_URL, 'POST', '/login', req.body);
@@ -252,7 +236,6 @@ async function manejarLogin(req, res) {
 app.post('/auth/login', manejarLogin);
 app.post('/login', manejarLogin);
 
-// Registro completo en 1 paso: crea el usuario en PHP y opcionalmente su perfil en /clientes o /trabajadores
 app.post('/auth/registro', async (req, res) => {
     const {
         nombre,
@@ -360,16 +343,10 @@ app.get('/auth/me', exigirAutenticacion, async (req, res) => {
     }
 });
 
-// =========================================================================
-// RUTAS HACIA API 1 (PHP): /usuarios, /clientes, /trabajadores
-// =========================================================================
 app.use(['/usuarios', '/clientes', '/trabajadores'], (req, res) => {
     return reenviarA(PHP_API_URL, req, res);
 });
 
-// =========================================================================
-// RUTAS HACIA API 2 (PYTHON): /proyectos, /postulaciones
-// =========================================================================
 app.post('/proyectos', (req, res) => {
     const body = { ...(req.body || {}) };
     if (body.cliente_id === undefined && body.usuario_id === undefined && req.usuario && req.usuario.rol === 'CLIENTE') {
@@ -386,7 +363,6 @@ app.post('/proyectos/:id/postulaciones', (req, res) => {
     return reenviarA(PYTHON_API_URL, req, res, body);
 });
 
-// Orquestación: al aceptar una postulación en Python, crea automáticamente la asignación en Express
 app.patch('/postulaciones/:id', async (req, res) => {
     try {
         const body = req.body || {};
@@ -432,9 +408,6 @@ app.use(['/proyectos', '/postulaciones'], (req, res) => {
     return reenviarA(PYTHON_API_URL, req, res);
 });
 
-// =========================================================================
-// RUTAS HACIA API 3 (EXPRESS): /asignaciones, /registros-tiempo, /facturas
-// =========================================================================
 app.post('/facturas', (req, res) => {
     const body = { ...(req.body || {}) };
     if (body.trabajador_id === undefined && body.idUsuario === undefined && req.usuario && req.usuario.rol === 'TRABAJADOR') {
@@ -447,9 +420,6 @@ app.use(['/asignaciones', '/registros-tiempo', '/facturas'], (req, res) => {
     return reenviarA(EXPRESS_API_URL, req, res);
 });
 
-// =========================================================================
-// RUTA NO ENCONTRADA EN EL GATEWAY
-// =========================================================================
 app.use((req, res) => {
     res.status(404).json({
         status: 'error',

@@ -18,6 +18,7 @@ venv/
 *.log
 npm-debug.log*
 *.tmp
+inicio_todo.ps1
 
 # Sistema operativo y editores
 .DS_Store
