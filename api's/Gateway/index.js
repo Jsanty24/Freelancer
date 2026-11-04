@@ -10,6 +10,7 @@ app.use(express.json());
 
 const FRONTEND_DIR = path.resolve(__dirname, '../../Frontend');
 app.use('/app', express.static(FRONTEND_DIR));
+app.use(express.static(FRONTEND_DIR));
 app.get('/', (req, res) => {
     res.redirect('/app/index.html');
 });

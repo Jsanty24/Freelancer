@@ -11,7 +11,7 @@ Write-Host -ForegroundColor Cyan
 Write-Host -ForegroundColor Cyan
 
 # 1. API PHP (127.0.0.1:8000)
-$PhpExe = if (Test-Path "C:\xampp\php\php.exe") { "C:\xampp\php\php.exe" } else { "php" }
+$PhpExe = if (Test-Path "http://localhost/api_usuario/") { "http://localhost/api_usuario/" } else { "php" }
 $PhpDir = Join-Path $Root "api's\api_usuario"
 Write-Host "[1/4] Iniciando API 1 (PHP) en 127.0.0.1:8000..." -ForegroundColor Green
 Start-Process -FilePath $PhpExe -ArgumentList "-S 127.0.0.1:8000 index.php" -WorkingDirectory $PhpDir -WindowStyle Minimized
@@ -35,6 +35,6 @@ Start-Process -FilePath "node" -ArgumentList "index.js" -WorkingDirectory $Gatew
 Start-Sleep -Seconds 2
 Write-Host ""
 Write-Host "Todos los servicios están activos:" -ForegroundColor Yellow
-Write-Host " -> Frontend Hub & Stitch : http://localhost:4000/app/index.html" -ForegroundColor White
+Write-Host " -> Aplicación Freelancer : http://localhost:4000/" -ForegroundColor White
 Write-Host " -> Salud del Gateway     : http://localhost:4000/health" -ForegroundColor White
-Start-Process "http://localhost:4000/app/index.html"
+Start-Process "http://localhost:4000/"

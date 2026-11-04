@@ -1,0 +1,231 @@
+/* ==========================================================================
+   Freelancer — Estilos Globales & Tipografía Google Sans
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Google+Sans+Flex:opsz,wght@8..144,400..800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  --font-principal: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-interfaz: 'Google Sans Flex', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --bg-surface: #f8f9ff;
+  --bg-card: #ffffff;
+  --bg-subtle: #eff4ff;
+  --bg-elevated: #e5eeff;
+  
+  --primary: #3e1cde;
+  --primary-hover: #3215b8;
+  --primary-container: #5842f5;
+  --primary-glow: rgba(88, 66, 245, 0.22);
+
+  --secondary: #006c47;
+  --secondary-light: #10b981;
+  --secondary-bg: #e6f9f0;
+
+  --accent-amber: #b45309;
+  --accent-amber-bg: #fef3c7;
+
+  --text-main: #0b1c30;
+  --text-muted: #474556;
+  --text-light: #787588;
+
+  --border-subtle: #e2e8f0;
+  --border-focus: #5842f5;
+  --shadow-card: 0 4px 20px -2px rgba(11, 28, 48, 0.05);
+  --shadow-hover: 0 12px 30px -4px rgba(62, 28, 222, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-principal);
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tipografía de Interfaz */
+nav, button, input, select, textarea, .font-ui, .nav-item, .chip-badge {
+  font-family: var(--font-interfaz) !important;
+}
+
+/* Tipografía Numérica / Código */
+.font-mono, .code-snippet, .timer-digits, .amount-val, .badge-id {
+  font-family: var(--font-mono) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Animaciones de cambio de vista */
+.view-panel {
+  display: none;
+  animation: viewFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.view-panel.active {
+  display: block;
+}
+
+@keyframes viewFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Tarjetas interactivas */
+.fl-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.fl-card:hover {
+  box-shadow: var(--shadow-hover);
+  border-color: rgba(88, 66, 245, 0.3);
+}
+
+/* Botones con estilo moderno */
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%);
+  color: #ffffff;
+  font-weight: 600;
+  border-radius: 0.625rem;
+  padding: 0.55rem 1.15rem;
+  transition: all 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  cursor: pointer;
+}
+.btn-primary:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 6px 18px -2px var(--primary-glow);
+  transform: translateY(-1px);
+}
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background-color: #ffffff;
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  font-weight: 500;
+  border-radius: 0.625rem;
+  padding: 0.55rem 1.15rem;
+  transition: all 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+.btn-secondary:hover {
+  background-color: var(--bg-subtle);
+  border-color: #cbd5e1;
+}
+
+/* Chips y Badges */
+.badge-tech {
+  background-color: #eff4ff;
+  color: #3e1cde;
+  border: 1px solid #dce9ff;
+  border-radius: 9999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.badge-success {
+  background-color: var(--secondary-bg);
+  color: var(--secondary);
+  border: 1px solid #bbf7d0;
+  border-radius: 9999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.badge-warning {
+  background-color: var(--accent-amber-bg);
+  color: var(--accent-amber);
+  border: 1px solid #fde68a;
+  border-radius: 9999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Modal styles */
+.modal-overlay {
+  background-color: rgba(11, 28, 48, 0.45);
+  backdrop-filter: blur(4px);
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.modal-overlay.open {
+  display: flex;
+}
+.modal-window {
+  background: #ffffff;
+  border-radius: 1.25rem;
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 25px 50px -12px rgba(11, 28, 48, 0.25);
+  width: 100%;
+  max-width: 580px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: modalScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Running Dock Glow */
+.tracker-active-pulse {
+  position: relative;
+}
+.tracker-active-pulse::after {
+  content: '';
+  position: absolute;
+  top: -2px; left: -2px; right: -2px; bottom: -2px;
+  border-radius: 0.75rem;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.45);
+  pointer-events: none;
+}

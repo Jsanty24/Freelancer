@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html class="scroll-smooth" lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Freelancer — Plataforma Integral de Contratación & Escrow</title>
+  <link rel="icon" type="image/svg+xml" href="./public/favicon.svg"/>
+
+  <!-- Google Fonts: Google Sans (Principal) & Google Sans Flex (Navegación e Interfaz) & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Google+Sans+Flex:opsz,wght@8..144,400..800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  
+  <!-- Material Symbols Outlined -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+
+  <!-- Estilos Globales Personalizados -->
+  <link rel="stylesheet" href="./css/app.css"/>
+</head>
+<body class="bg-[#f8f9ff] text-[#0b1c30] antialiased min-h-screen flex flex-col">
+
+  <!-- ================= BARRA DE NAVEGACIÓN SUPERIOR ================= -->
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
+    <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      
+      <!-- Logotipo & Marca Freelancer -->
+      <div class="flex items-center gap-6">
+        <a href="#marketplace" class="flex items-center gap-2.5 group">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-700 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md group-hover:scale-105 transition-transform">
+            F
+          </div>
+          <span class="text-xl font-bold tracking-tight text-slate-900 group-hover:text-violet-700 transition-colors">
+            Freelancer
+          </span>
+        </a>
+
+        <!-- Enlaces Principales de Navegación -->
+        <nav class="hidden md:flex items-center gap-1 font-ui">
+          <button 
+            onclick="window.App.cambiarVista('marketplace')" 
+            data-vista="marketplace" 
+            class="nav-link nav-link-active px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all">
+            <span class="material-symbols-outlined text-[17px]">storefront</span> Marketplace
+          </button>
+          <button 
+            onclick="window.App.cambiarVista('talento')" 
+            data-vista="talento" 
+            class="nav-link nav-link-inactive px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+            <span class="material-symbols-outlined text-[17px]">groups</span> Talento Vetted
+          </button>
+          <button 
+            onclick="window.App.cambiarVista('workspace')" 
+            data-vista="workspace" 
+            class="nav-link nav-link-inactive px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+            <span class="material-symbols-outlined text-[17px]">terminal</span> Workspace
+          </button>
+          <button 
+            onclick="window.App.cambiarVista('contratos')" 
+            data-vista="contratos" 
+            class="nav-link nav-link-inactive px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+            <span class="material-symbols-outlined text-[17px]">shield</span> Contratos
+          </button>
+          <button 
+            onclick="window.App.cambiarVista('finanzas')" 
+            data-vista="finanzas" 
+            class="nav-link nav-link-inactive px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+            <span class="material-symbols-outlined text-[17px]">account_balance_wallet</span> Finanzas
+          </button>
+        </nav>
+      </div>
+
+      <!-- Acciones Rápidas & Selector de Usuario de MySQL -->
+      <div class="flex items-center gap-3">
+        <!-- Botón Publicar Proyecto -->
+        <button onclick="window.App.abrirModalPublicarProyecto()" class="btn-primary text-xs py-1.5 px-3">
+          <span class="material-symbols-outlined text-[16px]">add</span> <span class="hidden sm:inline">Publicar Proyecto</span>
+        </button>
+
+        <!-- Selector de Usuario Activo en Tiempo Real -->
+        <div class="hidden lg:flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-1 pl-2.5">
+          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Simular:</span>
+          <select id="userSwitcherSelect" class="text-xs bg-transparent border-0 font-medium text-slate-800 focus:ring-0 cursor-pointer pr-6 py-0.5">
+            <!-- Cargado dinámicamente desde MySQL -->
+          </select>
+        </div>
+
+        <!-- Perfil Usuario Activo -->
+        <div class="flex items-center gap-2 pl-2 border-l border-slate-200">
+          <div id="navUserAvatar" class="w-8 h-8 rounded-full bg-violet-700 text-white font-bold flex items-center justify-center text-xs font-mono">
+            MB
+          </div>
+          <div class="hidden xl:block text-left">
+            <div id="navUserName" class="text-xs font-bold text-slate-800 leading-tight">Mateo Benítez</div>
+            <div id="navUserRole" class="text-[10px] text-slate-500 uppercase tracking-wider">TRABAJADOR</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= RUNNING DOCK: REALTIME TIME-TRACKER BAR ================= -->
+  <section id="runningDock" class="bg-white border-b border-slate-200 px-4 py-2.5 shadow-sm transition-all">
+    <div class="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Estado y Proyecto Asignado -->
+      <div class="flex items-center gap-3 flex-1 min-w-[280px]">
+        <span id="trackerStatusBadge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
+          <span class="w-2 h-2 rounded-full bg-slate-400"></span> Pausado
+        </span>
+
+        <div class="flex items-center gap-2 max-w-md w-full">
+          <span class="text-xs text-slate-500 font-semibold whitespace-nowrap">Proyecto:</span>
+          <select id="trackerProjectSelect" class="w-full text-xs py-1 px-2.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:border-violet-600 font-medium truncate">
+            <!-- Poblar dinámicamente -->
+          </select>
+        </div>
+      </div>
+
+      <!-- Reloj en vivo, Acumulado y Botones -->
+      <div class="flex items-center gap-4">
+        <!-- Reloj -->
+        <div class="flex items-center gap-2 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 font-mono">
+          <span class="material-symbols-outlined text-[16px] text-violet-700">schedule</span>
+          <span id="trackerDigits" class="text-sm font-bold text-slate-800 tracking-wider">00:00:00</span>
+        </div>
+
+        <!-- Acumulado en USD -->
+        <div class="hidden sm:flex items-center gap-1 font-mono text-xs">
+          <span class="text-slate-500">Acumulado:</span>
+          <span id="trackerAccumulated" class="text-emerald-700 font-bold">$0.00 USD</span>
+        </div>
+
+        <!-- Botón Play / Pause -->
+        <button id="trackerToggleBtn" onclick="window.Timer.toggle()" class="btn-primary py-1 px-2.5 text-xs" title="Iniciar / Pausar Temporizador">
+          <span id="trackerToggleIcon" class="material-symbols-outlined text-[18px]">play_arrow</span>
+        </button>
+
+        <!-- Botón Guardar en MySQL -->
+        <button id="trackerSaveBtn" onclick="window.Timer.guardarSesion()" class="btn-secondary py-1 px-2.5 text-xs text-slate-700" title="Guardar horas acumuladas en la base de datos">
+          <span class="material-symbols-outlined text-[17px]">save</span> <span class="hidden md:inline">Guardar Horas</span>
+        </button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================= CONTENEDOR PRINCIPAL DE VISTAS ================= -->
+  <main class="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div id="viewMarketplace" class="view-panel active"></div>
+    <div id="viewTalento" class="view-panel"></div>
+    <div id="viewWorkspace" class="view-panel"></div>
+    <div id="viewContratos" class="view-panel"></div>
+    <div id="viewFinanzas" class="view-panel"></div>
+  </main>
+
+  <!-- ================= PIE DE PÁGINA ================= -->
+  <footer class="bg-white border-t border-slate-200 py-6 mt-auto">
+    <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-slate-800">Freelancer</span>
+        <span>•</span>
+        <span>Plataforma Full-Stack con Microservicios en PHP, Python FastAPI, Express & Gateway</span>
+      </div>
+      <div class="flex items-center gap-3 font-mono">
+        <span class="flex items-center gap-1 text-emerald-700 font-semibold">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Conectado a MySQL
+        </span>
+        <span>•</span>
+        <a href="/health" target="_blank" class="hover:text-violet-700 underline">Salud del Sistema (:4000)</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ================= MODAL POSTULACIÓN ================= -->
+  <div id="postulacionModal" class="modal-overlay">
+    <div class="modal-window p-6">
+      <div class="flex items-start justify-between mb-4 pb-3 border-b border-slate-100">
+        <div>
+          <span class="badge-tech text-[10px] uppercase">Garantía Escrow</span>
+          <h3 class="text-base font-bold text-slate-900 mt-1">Enviar Propuesta de Trabajo</h3>
+          <p id="postulacionProyectoTitulo" class="text-xs text-violet-700 font-medium truncate max-w-sm"></p>
+        </div>
+        <button onclick="window.App.cerrarModalPostulacion()" class="text-slate-400 hover:text-slate-700">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <form onsubmit="window.App.enviarPostulacion(event)" class="space-y-4">
+        <input type="hidden" id="postulacionProyectoId"/>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Tarifa por Hora Propuesta (USD)</label>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-sm">$</span>
+            <input 
+              id="postulacionTarifaInput" 
+              type="number" 
+              step="0.5" 
+              min="10" 
+              value="75.00" 
+              required 
+              class="w-full pl-7 pr-4 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600 font-mono font-bold text-slate-900"
+            />
+          </div>
+          <span class="text-[11px] text-slate-400 mt-1 block">Los fondos se retienen en custodia hasta la aprobación de cada hito.</span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Carta de Presentación & Términos</label>
+          <textarea 
+            id="postulacionMensajeInput" 
+            rows="4" 
+            required 
+            placeholder="Describe tu enfoque técnico, entregables clave y experiencia relevante para este requerimiento..."
+            class="w-full p-3 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600 leading-relaxed"
+          ></textarea>
+        </div>
+
+        <div class="pt-3 flex justify-end gap-2 border-t border-slate-100">
+          <button type="button" onclick="window.App.cerrarModalPostulacion()" class="btn-secondary text-xs">Cancelar</button>
+          <button type="submit" class="btn-primary text-xs">
+            <span class="material-symbols-outlined text-[16px]">send</span> Enviar Propuesta a la BD
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL PUBLICAR PROYECTO ================= -->
+  <div id="publicarProyectoModal" class="modal-overlay">
+    <div class="modal-window p-6">
+      <div class="flex items-start justify-between mb-4 pb-3 border-b border-slate-100">
+        <div>
+          <span class="badge-tech text-[10px] uppercase">Nuevo Requerimiento</span>
+          <h3 class="text-base font-bold text-slate-900 mt-1">Publicar Oportunidad en Marketplace</h3>
+          <p class="text-xs text-slate-500">Se registrará en Python FastAPI y se notificará al talento calificado.</p>
+        </div>
+        <button onclick="window.App.cerrarModalPublicarProyecto()" class="text-slate-400 hover:text-slate-700">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <form onsubmit="window.App.guardarNuevoProyecto(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Título del Proyecto</label>
+          <input 
+            id="proyTituloInput" 
+            type="text" 
+            required 
+            placeholder="Ej. Integración de Billetera Escrow & Microservicios Cloud" 
+            class="w-full p-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600"
+          />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">Categoría</label>
+            <select id="proyTipoSelect" class="w-full p-2.5 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-violet-600 font-medium">
+              <option value="TECNOLOGIA">Tecnología & Código</option>
+              <option value="DISENO">Diseño & UI/UX</option>
+              <option value="MARKETING">Marketing & Growth</option>
+              <option value="REDACCION">Redacción & Whitepapers</option>
+              <option value="ASISTENCIA">Operaciones & Asistencia</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">Stack Tecnológico</label>
+            <input 
+              id="proyStackInput" 
+              type="text" 
+              placeholder="Ej. Python, FastAPI, React, Docker" 
+              class="w-full p-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600 font-mono"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Descripción Detallada</label>
+          <textarea 
+            id="proyDescInput" 
+            rows="4" 
+            required 
+            placeholder="Especifica los entregables esperados, requerimientos de arquitectura y objetivos comerciales..." 
+            class="w-full p-3 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600 leading-relaxed"
+          ></textarea>
+        </div>
+
+        <div class="pt-3 flex justify-end gap-2 border-t border-slate-100">
+          <button type="button" onclick="window.App.cerrarModalPublicarProyecto()" class="btn-secondary text-xs">Cancelar</button>
+          <button type="submit" class="btn-primary text-xs">
+            <span class="material-symbols-outlined text-[16px]">publish</span> Publicar en MySQL
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL GENÉRICO DINÁMICO ================= -->
+  <div id="genericModal" class="modal-overlay">
+    <div class="modal-window p-6">
+      <div class="flex items-start justify-between mb-4 pb-3 border-b border-slate-100">
+        <h3 id="genericModalTitle" class="text-base font-bold text-slate-900 leading-snug"></h3>
+        <button onclick="window.App.cerrarModalGenerico()" class="text-slate-400 hover:text-slate-700">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+      <div id="genericModalContent"></div>
+    </div>
+  </div>
+
+  <!-- ================= CONTENEDOR DE TOASTS ================= -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+  <!-- ================= SCRIPTS DE LA APLICACIÓN ================= -->
+  <script src="./js/api.js"></script>
+  <script src="./js/state.js"></script>
+  <script src="./js/timer.js"></script>
+  <script src="./js/views/marketplace.js"></script>
+  <script src="./js/views/talento.js"></script>
+  <script src="./js/views/workspace.js"></script>
+  <script src="./js/views/contratos.js"></script>
+  <script src="./js/views/finanzas.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>

@@ -84,6 +84,14 @@ def listar(db: Session, proyecto_id: int) -> list[Postulacion]:
     )
 
 
+def listar_todas(db: Session) -> list[Postulacion]:
+    return (
+        db.query(Postulacion)
+        .order_by(Postulacion.id.desc())
+        .all()
+    )
+
+
 def responder(
     db: Session, postulacion_id: int, data: PostulacionRespuesta
 ) -> Postulacion:
