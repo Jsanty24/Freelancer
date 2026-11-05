@@ -41,8 +41,8 @@ const TalentoView = {
 
     // Filtrar
     const filtrados = talentos.filter(t => {
-      const coincideDisp = this.filtroDisponibilidad === 'TODOS' 
-        ? true 
+      const coincideDisp = this.filtroDisponibilidad === 'TODOS'
+        ? true
         : (this.filtroDisponibilidad === 'DISPONIBLE' ? t.disponible : !t.disponible);
       const texto = `${t.nombre || ''} ${t.especialidad || ''}`.toLowerCase();
       const coincideBusqueda = !this.busqueda || texto.includes(this.busqueda.toLowerCase());
@@ -79,7 +79,7 @@ const TalentoView = {
             { id: 'DISPONIBLE', label: 'Disponibles Ahora' },
             { id: 'OCUPADO', label: 'En Proyecto' }
           ].map(f => `
-            <button 
+            <button
               onclick="TalentoView.setFiltro('${f.id}')"
               class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                 this.filtroDisponibilidad === f.id
@@ -93,11 +93,11 @@ const TalentoView = {
 
         <div class="relative w-full sm:w-72">
           <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
-          <input 
-            type="text" 
+          <input
+            type="text"
             value="${window.App.escapeHTML(this.busqueda)}"
             oninput="TalentoView.debouncedSetBusqueda(this.value)"
-            placeholder="Buscar por nombre o habilidad..." 
+            placeholder="Buscar por nombre o habilidad..."
             class="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-violet-600 focus:ring-1 focus:ring-violet-600 transition-all"
           />
         </div>

@@ -13,7 +13,7 @@
   --bg-card: #ffffff;
   --bg-subtle: #eff4ff;
   --bg-elevated: #e5eeff;
-  
+
   --primary: #3e1cde;
   --primary-hover: #3215b8;
   --primary-container: #5842f5;
@@ -252,32 +252,32 @@ html.dark body {
   background-color: var(--bg-surface);
   color: var(--text-main);
 }
-html.dark header, 
-html.dark #runningDock, 
+html.dark header,
+html.dark #runningDock,
 html.dark footer,
-html.dark .fl-card, 
+html.dark .fl-card,
 html.dark .modal-window {
   background-color: var(--bg-card) !important;
   border-color: var(--border-subtle) !important;
   color: var(--text-main);
 }
-html.dark input, 
-html.dark select, 
+html.dark input,
+html.dark select,
 html.dark textarea {
   background-color: #1a243b !important;
   border-color: #334155 !important;
   color: #f8fafc !important;
 }
-html.dark input::placeholder, 
+html.dark input::placeholder,
 html.dark textarea::placeholder {
   color: #64748b;
 }
-html.dark .bg-slate-50, 
+html.dark .bg-slate-50,
 html.dark .bg-slate-100 {
   background-color: #172238 !important;
   color: #e2e8f0;
 }
-html.dark .border-slate-100, 
+html.dark .border-slate-100,
 html.dark .border-slate-200 {
   border-color: #27354f !important;
 }

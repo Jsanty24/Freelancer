@@ -51,7 +51,7 @@ const AdminView = {
     // Calcular estadísticas globales
     const totalClientes = usuarios.filter(u => u.rol === 'CLIENTE').length;
     const totalTrabajadores = usuarios.filter(u => u.rol === 'TRABAJADOR').length;
-    
+
     let volumenPendiente = 0;
     let volumenPagado = 0;
     facturas.forEach(f => {
@@ -133,7 +133,7 @@ const AdminView = {
 
         <div class="flex flex-wrap items-center gap-2.5">
           <button onclick="AdminView.verificarSalud()" class="btn-secondary text-xs">
-            <span class="material-symbols-outlined text-[16px] ${this.cargandoSalud ? 'animate-spin' : ''}">refresh</span> 
+            <span class="material-symbols-outlined text-[16px] ${this.cargandoSalud ? 'animate-spin' : ''}">refresh</span>
             ${this.cargandoSalud ? 'Verificando...' : 'Diagnóstico de Servicios (:4000)'}
           </button>
           <button onclick="AdminView.exportarAuditoria()" class="btn-primary text-xs">
@@ -242,8 +242,8 @@ const AdminView = {
 
           <div class="flex items-center gap-2">
             <span class="text-xs text-slate-400">Filtrar rol:</span>
-            <select 
-              onchange="AdminView.setFiltroRol(this.value)" 
+            <select
+              onchange="AdminView.setFiltroRol(this.value)"
               class="text-xs py-1 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-medium">
               <option value="TODOS" ${this.filtroUsuarioRol === 'TODOS' ? 'selected' : ''}>Todos (${usuarios.length})</option>
               <option value="CLIENTE" ${this.filtroUsuarioRol === 'CLIENTE' ? 'selected' : ''}>Clientes (${totalClientes})</option>
@@ -302,8 +302,8 @@ const AdminView = {
 
           <div class="flex items-center gap-2">
             <span class="text-xs text-slate-400">Filtrar estado:</span>
-            <select 
-              onchange="AdminView.setFiltroEstado(this.value)" 
+            <select
+              onchange="AdminView.setFiltroEstado(this.value)"
               class="text-xs py-1 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-medium">
               <option value="TODOS" ${this.filtroProyectoEstado === 'TODOS' ? 'selected' : ''}>Todos (${proyectos.length})</option>
               <option value="ABIERTO" ${this.filtroProyectoEstado === 'ABIERTO' ? 'selected' : ''}>Abiertos</option>

@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
   <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Google+Sans+Flex:opsz,wght@8..144,400..800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-  
+
   <!-- Material Symbols Outlined -->
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 
@@ -30,13 +30,13 @@
   <!-- ================= BARRA DE NAVEGACIÓN SUPERIOR ================= -->
   <header class="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
     <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-      
+
       <!-- Logotipo & Marca Freelancer & Botón Menú Móvil -->
       <div class="flex items-center gap-3 sm:gap-6">
         <!-- Botón Menú Hamburguesa Móvil (< 768px) -->
-        <button 
-          id="mobileMenuBtn" 
-          onclick="window.App.toggleMenuMovil()" 
+        <button
+          id="mobileMenuBtn"
+          onclick="window.App.toggleMenuMovil()"
           class="md:hidden p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           title="Menú de Navegación">
           <span class="material-symbols-outlined text-[24px]">menu</span>
@@ -53,40 +53,40 @@
 
         <!-- Enlaces Principales de Navegación Desktop -->
         <nav class="hidden md:flex items-center gap-1 font-ui">
-          <button 
-            onclick="window.App.cambiarVista('marketplace')" 
-            data-vista="marketplace" 
+          <button
+            onclick="window.App.cambiarVista('marketplace')"
+            data-vista="marketplace"
             class="nav-link nav-link-active px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all">
             <span class="material-symbols-outlined text-[17px]">storefront</span> Marketplace
           </button>
-          <button 
-            onclick="window.App.cambiarVista('talento')" 
-            data-vista="talento" 
+          <button
+            onclick="window.App.cambiarVista('talento')"
+            data-vista="talento"
             class="nav-link nav-link-inactive px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800">
             <span class="material-symbols-outlined text-[17px]">groups</span> Talento
           </button>
-          <button 
-            onclick="window.App.cambiarVista('workspace')" 
-            data-vista="workspace" 
+          <button
+            onclick="window.App.cambiarVista('workspace')"
+            data-vista="workspace"
             class="nav-link nav-link-inactive px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800">
             <span class="material-symbols-outlined text-[17px]">terminal</span> Workspace
           </button>
-          <button 
-            onclick="window.App.cambiarVista('contratos')" 
-            data-vista="contratos" 
+          <button
+            onclick="window.App.cambiarVista('contratos')"
+            data-vista="contratos"
             class="nav-link nav-link-inactive px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800">
             <span class="material-symbols-outlined text-[17px]">shield</span> Contratos
           </button>
-          <button 
-            onclick="window.App.cambiarVista('finanzas')" 
-            data-vista="finanzas" 
+          <button
+            onclick="window.App.cambiarVista('finanzas')"
+            data-vista="finanzas"
             class="nav-link nav-link-inactive px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800">
             <span class="material-symbols-outlined text-[17px]">account_balance_wallet</span> Finanzas
           </button>
-          <button 
+          <button
             id="navLinkAdmin"
-            onclick="window.App.cambiarVista('admin')" 
-            data-vista="admin" 
+            onclick="window.App.cambiarVista('admin')"
+            data-vista="admin"
             class="nav-link nav-link-inactive hidden px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40">
             <span class="material-symbols-outlined text-[17px]">security</span> Admin
           </button>
@@ -96,26 +96,26 @@
       <!-- Acciones Rápidas, Dark Mode & Auth -->
       <div class="flex items-center gap-2 sm:gap-3">
         <!-- Toggle Modo Oscuro -->
-        <button 
-          id="darkModeToggleBtn" 
-          onclick="window.App.toggleModoOscuro()" 
-          class="p-2 rounded-xl text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" 
+        <button
+          id="darkModeToggleBtn"
+          onclick="window.App.toggleModoOscuro()"
+          class="p-2 rounded-xl text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           title="Cambiar Modo Claro / Oscuro">
           <span id="darkModeIcon" class="material-symbols-outlined text-[19px]">dark_mode</span>
         </button>
 
         <!-- Botón Publicar Proyecto (Solo CLIENTE) -->
-        <button 
-          id="btnPublicarProyectoHeader" 
-          onclick="window.App.abrirModalPublicarProyecto()" 
+        <button
+          id="btnPublicarProyectoHeader"
+          onclick="window.App.abrirModalPublicarProyecto()"
           class="hidden btn-primary text-xs py-1.5 px-3">
           <span class="material-symbols-outlined text-[16px]">add</span> <span class="hidden sm:inline">Publicar Proyecto</span>
         </button>
 
         <!-- Botón Iniciar Sesión / Registrarse -->
-        <button 
-          id="navBtnLogin" 
-          onclick="window.App.abrirModalLogin()" 
+        <button
+          id="navBtnLogin"
+          onclick="window.App.abrirModalLogin()"
           class="hidden sm:inline-flex btn-secondary text-xs py-1.5 px-2.5">
           <span class="material-symbols-outlined text-[16px]">login</span> Entrar
         </button>
@@ -130,10 +130,10 @@
             <div id="navUserRole" class="text-[10px] text-slate-500 uppercase tracking-wider">SIN SESIÓN</div>
           </div>
           <!-- Botón Logout rápido -->
-          <button 
-            id="navBtnLogout" 
-            onclick="window.App.cerrarSesion()" 
-            class="hidden p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors" 
+          <button
+            id="navBtnLogout"
+            onclick="window.App.cerrarSesion()"
+            class="hidden p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
             title="Cerrar sesión">
             <span class="material-symbols-outlined text-[18px]">logout</span>
           </button>
@@ -205,7 +205,7 @@
   <!-- ================= RUNNING DOCK: REALTIME TIME-TRACKER BAR ================= -->
   <section id="runningDock" class="bg-white border-b border-slate-200 px-4 py-2.5 shadow-sm transition-all">
     <div class="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-3">
-      
+
       <!-- Estado y Proyecto Asignado -->
       <div class="flex items-center gap-3 flex-1 min-w-[280px]">
         <span id="trackerStatusBadge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
@@ -303,13 +303,13 @@
           <label class="block text-xs font-bold text-slate-600 mb-1">Tarifa por Hora Propuesta (USD)</label>
           <div class="relative">
             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-sm">$</span>
-            <input 
-              id="postulacionTarifaInput" 
-              type="number" 
-              step="0.5" 
-              min="10" 
-              value="75.00" 
-              required 
+            <input
+              id="postulacionTarifaInput"
+              type="number"
+              step="0.5"
+              min="10"
+              value="75.00"
+              required
               class="w-full pl-7 pr-4 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600 font-mono font-bold text-slate-900"
             />
           </div>
@@ -318,10 +318,10 @@
 
         <div>
           <label class="block text-xs font-bold text-slate-600 mb-1">Carta de Presentación & Términos</label>
-          <textarea 
-            id="postulacionMensajeInput" 
-            rows="4" 
-            required 
+          <textarea
+            id="postulacionMensajeInput"
+            rows="4"
+            required
             placeholder="Describe tu enfoque técnico, entregables clave y experiencia relevante para este requerimiento..."
             class="w-full p-3 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600 leading-relaxed"
           ></textarea>
@@ -354,11 +354,11 @@
       <form onsubmit="window.App.guardarNuevoProyecto(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Título del Proyecto *</label>
-          <input 
-            id="proyTituloInput" 
-            type="text" 
-            required 
-            placeholder="Ej. Integración de Billetera Escrow & Microservicios Cloud" 
+          <input
+            id="proyTituloInput"
+            type="text"
+            required
+            placeholder="Ej. Integración de Billetera Escrow & Microservicios Cloud"
             class="w-full p-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600"
           />
         </div>
@@ -366,8 +366,8 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Categoría del Proyecto *</label>
-            <select 
-              id="proyTipoSelect" 
+            <select
+              id="proyTipoSelect"
               onchange="window.App.renderizarCamposDinamicosProyecto(this.value)"
               class="w-full p-2.5 text-xs rounded-xl border border-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:border-violet-600 font-medium">
               <option value="TECNOLOGIA">Tecnología & Código</option>
@@ -379,10 +379,10 @@
           </div>
           <div>
             <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Fecha de Inicio *</label>
-            <input 
-              id="proyFechaInicioInput" 
-              type="date" 
-              required 
+            <input
+              id="proyFechaInicioInput"
+              type="date"
+              required
               class="w-full p-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600 font-mono"
             />
           </div>
@@ -395,11 +395,11 @@
 
         <div>
           <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Descripción Detallada *</label>
-          <textarea 
-            id="proyDescInput" 
-            rows="4" 
-            required 
-            placeholder="Especifica los entregables esperados, requerimientos de arquitectura y objetivos comerciales..." 
+          <textarea
+            id="proyDescInput"
+            rows="4"
+            required
+            placeholder="Especifica los entregables esperados, requerimientos de arquitectura y objetivos comerciales..."
             class="w-full p-3 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600 leading-relaxed"
           ></textarea>
         </div>
@@ -435,11 +435,11 @@
           <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Correo Electrónico</label>
           <div class="relative">
             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">mail</span>
-            <input 
-              id="loginEmailInput" 
-              type="email" 
-              required 
-              placeholder="tu@email.com" 
+            <input
+              id="loginEmailInput"
+              type="email"
+              required
+              placeholder="tu@email.com"
               class="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600"
             />
           </div>
@@ -449,11 +449,11 @@
           <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Contraseña</label>
           <div class="relative">
             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">lock</span>
-            <input 
-              id="loginPasswordInput" 
-              type="password" 
-              required 
-              placeholder="••••••••" 
+            <input
+              id="loginPasswordInput"
+              type="password"
+              required
+              placeholder="••••••••"
               class="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600"
             />
           </div>
@@ -464,7 +464,7 @@
             <span class="material-symbols-outlined text-[16px]">login</span> Entrar a la Plataforma
           </button>
           <div class="text-center text-xs text-slate-500 mt-2">
-            ¿No tienes cuenta aún? 
+            ¿No tienes cuenta aún?
             <button type="button" onclick="window.App.cerrarModalLogin(); window.App.abrirModalRegistro();" class="text-violet-700 dark:text-violet-400 font-bold hover:underline">
               Crear cuenta nueva
             </button>
@@ -615,12 +615,12 @@
       <!-- Formulario de Envío de Mensaje -->
       <form id="chatForm" onsubmit="window.App.enviarMensajeChat(event)" class="mt-3 flex items-center gap-2">
         <input type="hidden" id="chatPostulacionIdInput"/>
-        <input 
-          id="chatMensajeInput" 
-          type="text" 
-          required 
+        <input
+          id="chatMensajeInput"
+          type="text"
+          required
           autocomplete="off"
-          placeholder="Escribe un mensaje o propuesta de ajuste..." 
+          placeholder="Escribe un mensaje o propuesta de ajuste..."
           class="flex-1 p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:border-violet-600"
         />
         <button type="submit" class="btn-primary text-xs py-2.5 px-3">

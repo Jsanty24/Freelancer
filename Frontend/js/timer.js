@@ -138,7 +138,7 @@ class TimeTracker {
     if (encontrada) {
       this.asignacionSeleccionada = encontrada;
       this.tarifaHora = Number(encontrada.tarifa_por_hora) || 70.0;
-      
+
       const select = document.getElementById('trackerProjectSelect');
       if (select && select.value !== String(asignacionId)) {
         select.value = asignacionId;
@@ -159,7 +159,7 @@ class TimeTracker {
   iniciar(esRestauracion = false) {
     if (this.activo && !esRestauracion) return;
     this.activo = true;
-    
+
     if (!this.inicioTimestamp) {
       this.inicioTimestamp = new Date();
     }
@@ -256,7 +256,7 @@ class TimeTracker {
       });
 
       window.App.mostrarToast(`¡Sesión guardada con éxito! +${horasDecimal} hrs registradas`, 'success');
-      
+
       // Reiniciar contador y limpiar almacenamiento local
       this.segundos = 0;
       this.baseSegundos = 0;

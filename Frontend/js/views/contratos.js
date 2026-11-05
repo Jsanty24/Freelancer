@@ -139,8 +139,8 @@ const ContratosView = {
                       </div>
 
                       <!-- Botón de Chat de Negociación Directa -->
-                      <button 
-                        onclick="window.App.abrirModalChat(${post.id})" 
+                      <button
+                        onclick="window.App.abrirModalChat(${post.id})"
                         class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 text-xs font-semibold hover:bg-violet-100 transition-colors">
                         <span class="material-symbols-outlined text-[16px]">forum</span>
                         Chat de Negociación ${cantidadMensajes > 0 ? `<span class="px-1.5 py-0.2 rounded-full bg-violet-600 text-white text-[10px] font-mono">${cantidadMensajes}</span>` : ''}
@@ -203,9 +203,9 @@ const ContratosView = {
           await window.API.responderPostulacion(postulacionId, nuevoEstado, 'Especialista Senior');
 
           window.App.mostrarToast(
-            esAceptar 
-              ? 'Propuesta aceptada y asignación creada.' 
-              : 'Postulación rechazada.', 
+            esAceptar
+              ? 'Propuesta aceptada y asignación creada.'
+              : 'Postulación rechazada.',
             'success'
           );
 

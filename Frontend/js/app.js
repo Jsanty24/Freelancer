@@ -850,8 +850,8 @@ const App = {
             <span>${fechaStr}</span>
           </div>
           <div class="max-w-[85%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed shadow-sm ${
-            esMio 
-              ? 'bg-violet-700 text-white rounded-br-none' 
+            esMio
+              ? 'bg-violet-700 text-white rounded-br-none'
               : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-bl-none'
           }">
             ${this.escapeHTML(msg.texto)}

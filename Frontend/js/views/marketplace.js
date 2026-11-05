@@ -104,7 +104,7 @@ const MarketplaceView = {
             { id: 'REDACCION', label: 'Redacción' },
             { id: 'ASISTENCIA', label: 'Operaciones' }
           ].map(cat => `
-            <button 
+            <button
               onclick="MarketplaceView.setFiltro('${cat.id}')"
               class="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
                 this.filtroActual === cat.id
@@ -121,8 +121,8 @@ const MarketplaceView = {
           <!-- Ordenamiento -->
           <div class="flex items-center gap-1.5 text-xs text-slate-500 whitespace-nowrap">
             <span class="material-symbols-outlined text-[16px]">sort</span>
-            <select 
-              onchange="MarketplaceView.setOrden(this.value)" 
+            <select
+              onchange="MarketplaceView.setOrden(this.value)"
               class="text-xs py-1.5 px-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-medium focus:outline-none focus:border-violet-600">
               <option value="recientes" ${this.ordenActual === 'recientes' ? 'selected' : ''}>Más recientes</option>
               <option value="antiguos" ${this.ordenActual === 'antiguos' ? 'selected' : ''}>Más antiguos</option>
@@ -134,12 +134,12 @@ const MarketplaceView = {
           <!-- Buscador con Debounce -->
           <div class="relative w-full sm:w-60">
             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
-            <input 
+            <input
               id="marketplaceSearchInput"
-              type="text" 
+              type="text"
               value="${window.App.escapeHTML(this.busqueda)}"
               oninput="MarketplaceView.debouncedSetBusqueda(this.value)"
-              placeholder="Buscar proyectos..." 
+              placeholder="Buscar proyectos..."
               class="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:border-violet-600 transition-all"
             />
           </div>
@@ -296,7 +296,7 @@ const MarketplaceView = {
         <!-- Paginación Footer -->
         ${totalPaginas > 1 ? `
           <div class="mt-8 flex items-center justify-center gap-3 font-mono text-xs">
-            <button 
+            <button
               onclick="MarketplaceView.cambiarPagina(${this.paginaActual - 1})"
               ${this.paginaActual <= 1 ? 'disabled class="opacity-40 cursor-not-allowed btn-secondary text-xs py-1.5 px-3"' : 'class="btn-secondary text-xs py-1.5 px-3"'}>
               <span class="material-symbols-outlined text-[16px]">arrow_back</span> Anterior
@@ -304,7 +304,7 @@ const MarketplaceView = {
             <span class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 font-bold text-slate-800 dark:text-slate-200">
               Página ${this.paginaActual} de ${totalPaginas}
             </span>
-            <button 
+            <button
               onclick="MarketplaceView.cambiarPagina(${this.paginaActual + 1})"
               ${this.paginaActual >= totalPaginas ? 'disabled class="opacity-40 cursor-not-allowed btn-secondary text-xs py-1.5 px-3"' : 'class="btn-secondary text-xs py-1.5 px-3"'}>
               Siguiente <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
