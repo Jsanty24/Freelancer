@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html class="scroll-smooth" lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Freelancer — Plataforma de trabajo freelance</title>
+  <link rel="icon" type="image/svg+xml" href="./public/favicon.svg"/>
+
+  <!-- Google Fonts: Google Sans (Principal) & Google Sans Flex (Navegación e Interfaz) & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Google+Sans+Flex:opsz,wght@8..144,400..800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  
+  <!-- Material Symbols Outlined -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+
+  <!-- Configuración de Tailwind CSS con Modo Oscuro -->
+  <script>
+    tailwind = {
+      darkMode: 'class'
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+
+  <!-- Estilos Globales Personalizados -->
+  <link rel="stylesheet" href="./css/app.css"/>
+</head>
+<body class="bg-[#f8f9ff] text-[#0b1c30] antialiased min-h-screen flex flex-col transition-colors duration-200">
+
+  <!-- ================= BARRA DE NAVEGACIÓN SUPERIOR ================= -->
+  <header class="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+    <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      
+      <!-- Logotipo & Marca Freelancer & Botón Menú Móvil -->
+      <div class="flex items-center gap-3 sm:gap-6">
+        <!-- Botón Menú Hamburguesa Móvil (< 768px) -->
+        <button 
+          id="mobileMenuBtn" 
+          onclick="window.App.toggleMenuMovil()" 
+          class="md:hidden p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          title="Menú de Navegación">
+          <span class="material-symbols-outlined text-[24px]">menu</span>
+        </button>
+
+        <a href="#marketplace" class="flex items-center gap-2.5 group">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-700 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md group-hover:scale-105 transition-transform">
+            F
+          </div>
+          <span class="text-xl font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-violet-600 transition-colors">
+            Freelancer
+          </span>
+        </a>
+
+        <!-- Enlaces Principales de Navegación Desktop -->
+        <nav class="hidden md:flex items-center gap-1 font-ui">
+          <button 
+            onclick="window.App.cambiarVista('marketplace')" 
+            data-vista="marketplace" 
+            class="nav-link nav-link-active px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all">
+            <span class="material-symbols-outlined text-[17px]">storefront</span> Marketplace
+          </button>
+          <button 
+            onclick="window.App.cambiarVista('talento')" 
+            data-vista="talento" 
+            class="nav-link nav-link-inactive px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800">
+            <span class="material-symbols-outlined text-[17px]">groups</span> Talento
+          </button>
+          <button 
+            onclick="window.App.cambiarVista('workspace')" 
+            data-vista="workspace" 
+            class="nav-link nav-link-inactive px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800">
+            <span class="material-symbols-outlined text-[17px]">terminal</span> Workspace
+          </button>
+          <button 
+            onclick="window.App.cambiarVista('contratos')" 
+            data-vista="contratos" 
+            class="nav-link nav-link-inactive px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800">
+            <span class="material-symbols-outlined text-[17px]">shield</span> Contratos
+          </button>
+          <button 
+            onclick="window.App.cambiarVista('finanzas')" 
+            data-vista="finanzas" 
+            class="nav-link nav-link-inactive px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800">
+            <span class="material-symbols-outlined text-[17px]">account_balance_wallet</span> Finanzas
+          </button>
+          <button 
+            id="navLinkAdmin"
+            onclick="window.App.cambiarVista('admin')" 
+            data-vista="admin" 
+            class="nav-link nav-link-inactive hidden px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40">
+            <span class="material-symbols-outlined text-[17px]">security</span> Admin
+          </button>
+        </nav>
+      </div>
+
+      <!-- Acciones Rápidas, Dark Mode & Auth -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Toggle Modo Oscuro -->
+        <button 
+          id="darkModeToggleBtn" 
+          onclick="window.App.toggleModoOscuro()" 
+          class="p-2 rounded-xl text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" 
+          title="Cambiar Modo Claro / Oscuro">
+          <span id="darkModeIcon" class="material-symbols-outlined text-[19px]">dark_mode</span>
+        </button>
+
+        <!-- Botón Publicar Proyecto (Solo CLIENTE) -->
+        <button 
+          id="btnPublicarProyectoHeader" 
+          onclick="window.App.abrirModalPublicarProyecto()" 
+          class="hidden btn-primary text-xs py-1.5 px-3">
+          <span class="material-symbols-outlined text-[16px]">add</span> <span class="hidden sm:inline">Publicar Proyecto</span>
+        </button>
+
+        <!-- Botón Iniciar Sesión / Registrarse -->
+        <button 
+          id="navBtnLogin" 
+          onclick="window.App.abrirModalLogin()" 
+          class="hidden sm:inline-flex btn-secondary text-xs py-1.5 px-2.5">
+          <span class="material-symbols-outlined text-[16px]">login</span> Entrar
+        </button>
+
+        <!-- Perfil Usuario Activo -->
+        <div class="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-700">
+          <div id="navUserAvatar" class="w-8 h-8 rounded-full bg-violet-700 text-white font-bold flex items-center justify-center text-xs font-mono shadow-sm">
+            ?
+          </div>
+          <div class="hidden xl:block text-left">
+            <div id="navUserName" class="text-xs font-bold text-slate-800 dark:text-slate-200 leading-tight">Invitado</div>
+            <div id="navUserRole" class="text-[10px] text-slate-500 uppercase tracking-wider">SIN SESIÓN</div>
+          </div>
+          <!-- Botón Logout rápido -->
+          <button 
+            id="navBtnLogout" 
+            onclick="window.App.cerrarSesion()" 
+            class="hidden p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors" 
+            title="Cerrar sesión">
+            <span class="material-symbols-outlined text-[18px]">logout</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= MENÚ MÓVIL (DRAWER RESPONSIVE) ================= -->
+  <div id="mobileDrawerOverlay" class="mobile-drawer-overlay" onclick="window.App.cerrarMenuMovil()">
+    <div class="mobile-drawer p-5 justify-between" onclick="event.stopPropagation()">
+      <div>
+        <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100 dark:border-slate-800">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-violet-700 text-white font-bold flex items-center justify-center text-sm">F</div>
+            <span class="font-bold text-base text-slate-900 dark:text-white">Menú Freelancer</span>
+          </div>
+          <button onclick="window.App.cerrarMenuMovil()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+            <span class="material-symbols-outlined text-[20px]">close</span>
+          </button>
+        </div>
+
+        <!-- Perfil en Menú Móvil -->
+        <div class="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-xl mb-4 border border-slate-100 dark:border-slate-700">
+          <div class="flex items-center gap-3">
+            <div id="mobileNavAvatar" class="w-9 h-9 rounded-full bg-violet-700 text-white font-bold flex items-center justify-center text-xs font-mono">?</div>
+            <div class="flex-1 truncate">
+              <div id="mobileNavName" class="text-xs font-bold text-slate-900 dark:text-white truncate">Invitado</div>
+              <div id="mobileNavRole" class="text-[10px] text-violet-700 dark:text-violet-400 font-bold uppercase tracking-wider">SIN SESIÓN</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Enlaces Móviles -->
+        <nav class="space-y-1">
+          <button onclick="window.App.cambiarVista('marketplace'); window.App.cerrarMenuMovil();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
+            <span class="material-symbols-outlined text-[18px] text-violet-700">storefront</span> Marketplace
+          </button>
+          <button onclick="window.App.cambiarVista('talento'); window.App.cerrarMenuMovil();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
+            <span class="material-symbols-outlined text-[18px] text-emerald-600">groups</span> Talento
+          </button>
+          <button onclick="window.App.cambiarVista('workspace'); window.App.cerrarMenuMovil();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
+            <span class="material-symbols-outlined text-[18px] text-indigo-600">terminal</span> Workspace
+          </button>
+          <button onclick="window.App.cambiarVista('contratos'); window.App.cerrarMenuMovil();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
+            <span class="material-symbols-outlined text-[18px] text-amber-600">description</span> Contratos
+          </button>
+          <button onclick="window.App.cambiarVista('finanzas'); window.App.cerrarMenuMovil();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
+            <span class="material-symbols-outlined text-[18px] text-emerald-700">account_balance_wallet</span> Finanzas
+          </button>
+          <button id="mobileNavLinkAdmin" onclick="window.App.cambiarVista('admin'); window.App.cerrarMenuMovil();" class="hidden w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-700 dark:text-rose-400">
+            <span class="material-symbols-outlined text-[18px]">security</span> Consola Admin
+          </button>
+        </nav>
+      </div>
+
+      <!-- Footer Menú Móvil -->
+      <div class="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
+        <button onclick="window.App.abrirModalLogin(); window.App.cerrarMenuMovil();" class="w-full btn-secondary text-xs justify-center py-2">
+          <span class="material-symbols-outlined text-[16px]">account_circle</span> Iniciar Sesión / Registro
+        </button>
+        <button onclick="window.App.toggleModoOscuro()" class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+          <span class="material-symbols-outlined text-[16px]">contrast</span> Alternar Modo Oscuro
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= RUNNING DOCK: REALTIME TIME-TRACKER BAR ================= -->
+  <section id="runningDock" class="bg-white border-b border-slate-200 px-4 py-2.5 shadow-sm transition-all">
+    <div class="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Estado y Proyecto Asignado -->
+      <div class="flex items-center gap-3 flex-1 min-w-[280px]">
+        <span id="trackerStatusBadge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
+          <span class="w-2 h-2 rounded-full bg-slate-400"></span> Pausado
+        </span>
+
+        <div class="flex items-center gap-2 max-w-md w-full">
+          <span class="text-xs text-slate-500 font-semibold whitespace-nowrap">Proyecto:</span>
+          <select id="trackerProjectSelect" class="w-full text-xs py-1 px-2.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:border-violet-600 font-medium truncate">
+            <!-- Poblar dinámicamente -->
+          </select>
+        </div>
+      </div>
+
+      <!-- Reloj en vivo, Acumulado y Botones -->
+      <div class="flex items-center gap-4">
+        <!-- Reloj -->
+        <div class="flex items-center gap-2 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 font-mono">
+          <span class="material-symbols-outlined text-[16px] text-violet-700">schedule</span>
+          <span id="trackerDigits" class="text-sm font-bold text-slate-800 tracking-wider">00:00:00</span>
+        </div>
+
+        <!-- Acumulado en USD -->
+        <div class="hidden sm:flex items-center gap-1 font-mono text-xs">
+          <span class="text-slate-500">Acumulado:</span>
+          <span id="trackerAccumulated" class="text-emerald-700 font-bold">$0.00 USD</span>
+        </div>
+
+        <!-- Botón Play / Pause -->
+        <button id="trackerToggleBtn" onclick="window.Timer.toggle()" class="btn-primary py-1 px-2.5 text-xs" title="Iniciar / Pausar Temporizador">
+          <span id="trackerToggleIcon" class="material-symbols-outlined text-[18px]">play_arrow</span>
+        </button>
+
+        <!-- Botón Guardar en MySQL -->
+        <button id="trackerSaveBtn" onclick="window.Timer.guardarSesion()" class="btn-secondary py-1 px-2.5 text-xs text-slate-700" title="Guardar horas acumuladas en la base de datos">
+          <span class="material-symbols-outlined text-[17px]">save</span> <span class="hidden md:inline">Guardar Horas</span>
+        </button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================= CONTENEDOR PRINCIPAL DE VISTAS ================= -->
+  <main class="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div id="serviceErrorBanner" class="hidden mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200" role="status" aria-live="polite"></div>
+    <div id="viewMarketplace" class="view-panel active"></div>
+    <div id="viewTalento" class="view-panel"></div>
+    <div id="viewWorkspace" class="view-panel"></div>
+    <div id="viewContratos" class="view-panel"></div>
+    <div id="viewFinanzas" class="view-panel"></div>
+    <div id="viewAdmin" class="view-panel"></div>
+  </main>
+
+  <!-- ================= PIE DE PÁGINA ================= -->
+  <footer class="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-6 mt-auto">
+    <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-slate-800 dark:text-white">Freelancer</span>
+        <span>•</span>
+        <span>Plataforma Full-Stack con Microservicios en PHP, Python FastAPI, Express & Gateway</span>
+      </div>
+      <div class="flex items-center gap-3 font-mono">
+        <span class="flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-semibold">
+          <span id="platformStatusIndicator" class="w-2 h-2 rounded-full bg-slate-400"></span>
+          <span id="platformStatusLabel">Verificando servicios...</span>
+        </span>
+        <span>•</span>
+        <a href="/health" target="_blank" class="hover:text-violet-700 dark:hover:text-violet-400 underline">Salud (:4000)</a>
+        <span>•</span>
+        <button onclick="window.App.abrirModalAdminLogin()" class="hover:text-rose-600 dark:hover:text-rose-400 flex items-center gap-1 font-semibold text-rose-700 dark:text-rose-400">
+          <span class="material-symbols-outlined text-[15px]">security</span> Acceso Admin
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ================= MODAL POSTULACIÓN ================= -->
+  <div id="postulacionModal" class="modal-overlay">
+    <div class="modal-window p-6">
+      <div class="flex items-start justify-between mb-4 pb-3 border-b border-slate-100">
+        <div>
+          <span class="badge-tech text-[10px] uppercase">Nueva propuesta</span>
+          <h3 class="text-base font-bold text-slate-900 mt-1">Enviar Propuesta de Trabajo</h3>
+          <p id="postulacionProyectoTitulo" class="text-xs text-violet-700 font-medium truncate max-w-sm"></p>
+        </div>
+        <button onclick="window.App.cerrarModalPostulacion()" class="text-slate-400 hover:text-slate-700">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <form onsubmit="window.App.enviarPostulacion(event)" class="space-y-4">
+        <input type="hidden" id="postulacionProyectoId"/>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Tarifa por Hora Propuesta (USD)</label>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-sm">$</span>
+            <input 
+              id="postulacionTarifaInput" 
+              type="number" 
+              step="0.5" 
+              min="10" 
+              value="75.00" 
+              required 
+              class="w-full pl-7 pr-4 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600 font-mono font-bold text-slate-900"
+            />
+          </div>
+          <span class="text-[11px] text-slate-400 mt-1 block">Esta plataforma no procesa pagos ni custodia fondos.</span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Carta de Presentación & Términos</label>
+          <textarea 
+            id="postulacionMensajeInput" 
+            rows="4" 
+            required 
+            placeholder="Describe tu enfoque técnico, entregables clave y experiencia relevante para este requerimiento..."
+            class="w-full p-3 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600 leading-relaxed"
+          ></textarea>
+        </div>
+
+        <div class="pt-3 flex justify-end gap-2 border-t border-slate-100">
+          <button type="button" onclick="window.App.cerrarModalPostulacion()" class="btn-secondary text-xs">Cancelar</button>
+          <button type="submit" class="btn-primary text-xs">
+            <span class="material-symbols-outlined text-[16px]">send</span> Enviar Propuesta a la BD
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL PUBLICAR PROYECTO (DINÁMICO POR CATEGORÍA) ================= -->
+  <div id="publicarProyectoModal" class="modal-overlay">
+    <div class="modal-window p-6">
+      <div class="flex items-start justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div>
+          <span class="badge-tech text-[10px] uppercase">Nuevo Requerimiento</span>
+          <h3 class="text-base font-bold text-slate-900 dark:text-white mt-1">Publicar Oportunidad en Marketplace</h3>
+          <p class="text-xs text-slate-500">Se registrará en Python FastAPI y validará según el esquema de la categoría.</p>
+        </div>
+        <button onclick="window.App.cerrarModalPublicarProyecto()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <form onsubmit="window.App.guardarNuevoProyecto(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Título del Proyecto *</label>
+          <input 
+            id="proyTituloInput" 
+            type="text" 
+            required 
+            placeholder="Ej. Integración de Billetera Escrow & Microservicios Cloud" 
+            class="w-full p-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600"
+          />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Categoría del Proyecto *</label>
+            <select 
+              id="proyTipoSelect" 
+              onchange="window.App.renderizarCamposDinamicosProyecto(this.value)"
+              class="w-full p-2.5 text-xs rounded-xl border border-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:border-violet-600 font-medium">
+              <option value="TECNOLOGIA">Tecnología & Código</option>
+              <option value="DISENO">Diseño & UI/UX</option>
+              <option value="MARKETING">Marketing & Growth</option>
+              <option value="REDACCION">Redacción & Contenido</option>
+              <option value="ASISTENCIA">Operaciones & Asistencia</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Fecha de Inicio *</label>
+            <input 
+              id="proyFechaInicioInput" 
+              type="date" 
+              required 
+              class="w-full p-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600 font-mono"
+            />
+          </div>
+        </div>
+
+        <!-- Campos Dinámicos según Categoría (Esquema MySQL / FastAPI) -->
+        <div id="proyCamposDinamicos" class="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+          <!-- Renderizado dinámicamente según la categoría elegida -->
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Descripción Detallada *</label>
+          <textarea 
+            id="proyDescInput" 
+            rows="4" 
+            required 
+            placeholder="Especifica los entregables esperados, requerimientos de arquitectura y objetivos comerciales..." 
+            class="w-full p-3 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600 leading-relaxed"
+          ></textarea>
+        </div>
+
+        <div class="pt-3 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+          <button type="button" onclick="window.App.cerrarModalPublicarProyecto()" class="btn-secondary text-xs">Cancelar</button>
+          <button type="submit" class="btn-primary text-xs">
+            <span class="material-symbols-outlined text-[16px]">publish</span> Publicar en MySQL
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL LOGIN (AUTENTICACIÓN REAL) ================= -->
+  <div id="loginModal" class="modal-overlay">
+    <div class="modal-window p-6 max-w-md">
+      <div class="flex items-start justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-violet-700 text-white flex items-center justify-center font-bold">F</div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900 dark:text-white">Iniciar Sesión</h3>
+            <p class="text-xs text-slate-500">Autenticación con JWT sobre microservicio PHP</p>
+          </div>
+        </div>
+        <button onclick="window.App.cerrarModalLogin()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <form onsubmit="window.App.manejarLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Correo Electrónico</label>
+          <div class="relative">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">mail</span>
+            <input 
+              id="loginEmailInput" 
+              type="email" 
+              required 
+              placeholder="tu@email.com" 
+              class="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Contraseña</label>
+          <div class="relative">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">lock</span>
+            <input 
+              id="loginPasswordInput" 
+              type="password" 
+              required 
+              placeholder="••••••••" 
+              class="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600"
+            />
+          </div>
+        </div>
+
+        <div class="pt-2 flex flex-col gap-2">
+          <button type="submit" class="btn-primary text-xs justify-center py-2.5">
+            <span class="material-symbols-outlined text-[16px]">login</span> Entrar a la Plataforma
+          </button>
+          <div class="text-center text-xs text-slate-500 mt-2">
+            ¿No tienes cuenta aún? 
+            <button type="button" onclick="window.App.cerrarModalLogin(); window.App.abrirModalRegistro();" class="text-violet-700 dark:text-violet-400 font-bold hover:underline">
+              Crear cuenta nueva
+            </button>
+          </div>
+          <div class="text-center text-xs text-slate-500">
+            <button type="button" onclick="window.App.cerrarModalLogin(); window.App.abrirModalAdminLogin();" class="text-rose-700 dark:text-rose-400 font-bold hover:underline">
+              Acceso exclusivo para administradores
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL DE ACCESO ADMINISTRADOR ================= -->
+  <div id="adminLoginModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="adminLoginTitle">
+    <div class="modal-window p-6 max-w-md">
+      <div class="flex items-start justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 flex items-center justify-center">
+            <span class="material-symbols-outlined text-[18px]">security</span>
+          </div>
+          <div>
+            <h3 id="adminLoginTitle" class="text-base font-bold text-slate-900 dark:text-white">Acceso de administración</h3>
+            <p class="text-xs text-slate-500">Ingresa con tus credenciales de administrador.</p>
+          </div>
+        </div>
+        <button type="button" onclick="window.App.cerrarModalAdminLogin()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" aria-label="Cerrar">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <form onsubmit="window.App.manejarAdminLogin(event)" class="space-y-4">
+        <div>
+          <label for="adminLoginEmailInput" class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Correo de administrador</label>
+          <input id="adminLoginEmailInput" name="email" type="email" autocomplete="username" required class="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 focus:outline-none focus:border-rose-600"/>
+        </div>
+        <div>
+          <label for="adminLoginPasswordInput" class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Contraseña</label>
+          <input id="adminLoginPasswordInput" name="password" type="password" autocomplete="current-password" minlength="16" required class="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 focus:outline-none focus:border-rose-600"/>
+        </div>
+        <div class="pt-2 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+          <button type="button" onclick="window.App.cerrarModalAdminLogin()" class="btn-secondary text-xs">Cancelar</button>
+          <button type="submit" class="btn-primary bg-rose-700 text-xs py-2.5">
+            <span class="material-symbols-outlined text-[16px]">verified_user</span> Entrar al panel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL REGISTRO (RBAC: CLIENTE / TRABAJADOR) ================= -->
+  <div id="registroModal" class="modal-overlay">
+    <div class="modal-window p-6 max-w-lg">
+      <div class="flex items-start justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div>
+          <span class="badge-tech text-[10px] uppercase">Alta de Usuario</span>
+          <h3 class="text-base font-bold text-slate-900 dark:text-white mt-1">Registrarse en Freelancer</h3>
+          <p class="text-xs text-slate-500">Crea tu perfil con rol asignado y credenciales en MySQL</p>
+        </div>
+        <button onclick="window.App.cerrarModalRegistro()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <form onsubmit="window.App.manejarRegistro(event)" class="space-y-3.5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Nombre Completo *</label>
+            <input id="regNombreInput" type="text" required placeholder="Ej. Camila Morales" class="w-full p-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600"/>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Email *</label>
+            <input id="regEmailInput" type="email" required placeholder="correo@dominio.com" class="w-full p-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600"/>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Teléfono</label>
+            <input id="regTelefonoInput" type="tel" placeholder="+57 300 1234567" class="w-full p-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600"/>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Contraseña *</label>
+            <input id="regPasswordInput" type="password" required minlength="6" placeholder="Mínimo 6 caracteres" class="w-full p-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-violet-600"/>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Tipo de Perfil (Rol) *</label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="flex items-center gap-2 p-2.5 border rounded-xl cursor-pointer hover:border-violet-600 transition-colors bg-white dark:bg-slate-800">
+              <input type="radio" name="regRolRadio" value="CLIENTE" checked onchange="window.App.renderizarCamposRegistro('CLIENTE')" class="text-violet-600 focus:ring-violet-600"/>
+              <div>
+                <span class="block text-xs font-bold text-slate-900 dark:text-white">Cliente / Empresa</span>
+                <span class="block text-[10px] text-slate-400">Publicar y contratar</span>
+              </div>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 border rounded-xl cursor-pointer hover:border-violet-600 transition-colors bg-white dark:bg-slate-800">
+              <input type="radio" name="regRolRadio" value="TRABAJADOR" onchange="window.App.renderizarCamposRegistro('TRABAJADOR')" class="text-violet-600 focus:ring-violet-600"/>
+              <div>
+                <span class="block text-xs font-bold text-slate-900 dark:text-white">Freelancer / Talento</span>
+                <span class="block text-[10px] text-slate-400">Postular y trabajar</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Campos Condicionales de Perfil -->
+        <div id="regCamposDinamicos" class="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+          <!-- Dinámico: CLIENTE (razon social, direccion) vs TRABAJADOR (especialidad, disponibilidad) -->
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+          <button type="button" onclick="window.App.cerrarModalRegistro()" class="btn-secondary text-xs">Cancelar</button>
+          <button type="submit" class="btn-primary text-xs">
+            <span class="material-symbols-outlined text-[16px]">how_to_reg</span> Registrar Perfil
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL CHAT INTERNO (MENSAJERÍA ESCROW) ================= -->
+  <div id="chatModal" class="modal-overlay">
+    <div class="modal-window p-6 max-w-xl flex flex-col max-h-[85vh]">
+      <!-- Header del Chat -->
+      <div class="flex items-start justify-between pb-3 mb-3 border-b border-slate-100 dark:border-slate-800">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 flex items-center justify-center">
+            <span class="material-symbols-outlined text-[20px]">forum</span>
+          </div>
+          <div>
+            <h3 id="chatModalTitulo" class="text-sm font-bold text-slate-900 dark:text-white leading-tight truncate max-w-xs">Chat de Negociación</h3>
+            <p id="chatModalSubtitulo" class="text-[11px] text-slate-500 font-mono">Conversación sobre la propuesta</p>
+          </div>
+        </div>
+        <button onclick="window.App.cerrarModalChat()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+
+      <!-- Historial de Mensajes -->
+      <div id="chatMensajesList" class="flex-1 overflow-y-auto space-y-3 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800 min-h-[260px] max-h-[360px]">
+        <!-- Mensajes renderizados dinámicamente -->
+      </div>
+
+      <!-- Formulario de Envío de Mensaje -->
+      <form id="chatForm" onsubmit="window.App.enviarMensajeChat(event)" class="mt-3 flex items-center gap-2">
+        <input type="hidden" id="chatPostulacionIdInput"/>
+        <input 
+          id="chatMensajeInput" 
+          type="text" 
+          required 
+          autocomplete="off"
+          placeholder="Escribe un mensaje o propuesta de ajuste..." 
+          class="flex-1 p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:border-violet-600"
+        />
+        <button type="submit" class="btn-primary text-xs py-2.5 px-3">
+          <span class="material-symbols-outlined text-[16px]">send</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL GENÉRICO DINÁMICO ================= -->
+  <div id="genericModal" class="modal-overlay">
+    <div class="modal-window p-6">
+      <div class="flex items-start justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <h3 id="genericModalTitle" class="text-base font-bold text-slate-900 dark:text-white leading-snug"></h3>
+        <button onclick="window.App.cerrarModalGenerico()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+          <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+      </div>
+      <div id="genericModalContent" class="text-slate-700 dark:text-slate-300"></div>
+    </div>
+  </div>
+
+  <!-- ================= CONTENEDOR DE TOASTS ================= -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+  <!-- ================= SCRIPTS DE LA APLICACIÓN ================= -->
+  <script src="./js/api.js"></script>
+  <script src="./js/state.js"></script>
+  <script src="./js/timer.js"></script>
+  <script src="./js/views/marketplace.js"></script>
+  <script src="./js/views/talento.js"></script>
+  <script src="./js/views/workspace.js"></script>
+  <script src="./js/views/contratos.js"></script>
+  <script src="./js/views/finanzas.js"></script>
+  <script src="./js/views/admin.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>

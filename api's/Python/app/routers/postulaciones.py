@@ -49,6 +49,18 @@ def crear_postulacion(
 
 
 @router.get(
+    "/postulaciones",
+    response_model=list[schemas.PostulacionResponse],
+    summary="Listar todas las postulaciones",
+)
+def listar_todas_postulaciones(
+    db: Session = Depends(get_db),
+):
+    """Devuelve todas las postulaciones registradas en el sistema."""
+    return servicio.listar_todas(db)
+
+
+@router.get(
     "/proyectos/{proyecto_id}/postulaciones",
     response_model=list[schemas.PostulacionResponse],
     summary="Listar postulaciones de un proyecto",

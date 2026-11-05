@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
@@ -21,9 +21,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("api_proyectos")
 
-INTERNAL_API_KEY = (
-    os.getenv("INTERNAL_API_KEY") or "clave-interna-gateway-freelancer-2026"
-).strip()
+INTERNAL_API_KEY = (os.getenv("INTERNAL_API_KEY") or "").strip()
 
 RUTAS_PUBLICAS_INTERNAS = {"/", "/health", "/docs", "/redoc", "/openapi.json"}
 
@@ -77,7 +75,7 @@ app.add_middleware(
 async def verificar_clave_interna(request: Request, call_next):
     if request.method != "OPTIONS" and request.url.path not in RUTAS_PUBLICAS_INTERNAS:
         clave_recibida = request.headers.get("X-Internal-Key") or ""
-        if not hmac.compare_digest(clave_recibida, INTERNAL_API_KEY):
+        if not INTERNAL_API_KEY or not hmac.compare_digest(clave_recibida, INTERNAL_API_KEY):
             return JSONResponse(
                 status_code=403,
                 content={
@@ -117,8 +115,45 @@ def health():
         db = SessionLocal()
         try:
             db.execute(text("SELECT 1"))
+            esquema_requerido = {
+                "usuarios": {"id", "rol", "password_hash"},
+                "clientes": {"usuario_id"},
+                "trabajadores": {"usuario_id"},
+                "proyectos": {"id", "cliente_id", "fecha_inicio", "tipo", "estado"},
+                "postulaciones": {"id", "proyecto_id", "trabajador_id", "tarifa_propuesta", "estado"},
+                "asignaciones": {"id", "trabajador_id", "proyecto_id", "tarifa_por_hora"},
+                "registros_tiempo": {"id", "asignacion_id", "inicio", "horas", "estado"},
+                "facturas": {"id", "cliente_id", "trabajador_id", "valor_total", "estado_factura"},
+                "proyectos_tecnologia": {"proyecto_id", "tipo", "lenguaje_principal"},
+                "proyectos_diseno": {"proyecto_id", "tipo", "software_utilizado"},
+                "proyectos_redaccion": {"proyecto_id", "tipo", "cantidad_palabras"},
+                "proyectos_marketing": {"proyecto_id", "tipo", "plataforma_objetivo"},
+                "proyectos_asistencia": {"proyecto_id", "tipo", "herramientas_manejo"},
+            }
+            inspector = inspect(db.get_bind())
+            tablas_disponibles = set(inspector.get_table_names())
+            columnas_faltantes = {
+                tabla: sorted(columnas - {columna["name"] for columna in inspector.get_columns(tabla)})
+                for tabla, columnas in esquema_requerido.items()
+                if tabla in tablas_disponibles
+            }
+            tablas_faltantes = set(esquema_requerido) - tablas_disponibles
+            columnas_faltantes = {
+                tabla: columnas
+                for tabla, columnas in columnas_faltantes.items()
+                if columnas
+            }
+            if tablas_faltantes or columnas_faltantes:
+                logger.error(
+                    "La base de datos necesita migrar su esquema; tablas faltantes: %s; columnas faltantes: %s",
+                    sorted(tablas_faltantes),
+                    columnas_faltantes,
+                )
+                raise ErrorAPI(503, "El esquema de la base de datos requiere una migracion")
         finally:
             db.close()
+    except ErrorAPI:
+        raise
     except Exception:
         logger.exception("GET /health: fallo el SELECT 1 contra la base de datos")
         raise ErrorAPI(503, "La base de datos no responde") from None

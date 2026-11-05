@@ -10,6 +10,7 @@ app.use(express.json());
 
 const FRONTEND_DIR = path.resolve(__dirname, '../../Frontend');
 app.use('/app', express.static(FRONTEND_DIR));
+app.use(express.static(FRONTEND_DIR));
 app.get('/', (req, res) => {
     res.redirect('/app/index.html');
 });
@@ -18,9 +19,14 @@ const PORT = Number(process.env.PORT) || 4000;
 const PHP_API_URL = (process.env.PHP_API_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
 const PYTHON_API_URL = (process.env.PYTHON_API_URL || 'http://127.0.0.1:5000').replace(/\/+$/, '');
 const EXPRESS_API_URL = (process.env.EXPRESS_API_URL || 'http://127.0.0.1:3000').replace(/\/+$/, '');
-const INTERNAL_API_KEY = (process.env.INTERNAL_API_KEY || 'clave-interna-gateway-freelancer-2026').trim();
-const JWT_SECRET = (process.env.JWT_SECRET || 'ZpRMXodtzvxILFzn0zjkmwTG4i7YCj1PkWFUql--Gg6lwpWdJMD3j8vjuhDm6us6').trim();
+const INTERNAL_API_KEY = (process.env.INTERNAL_API_KEY || '').trim();
+const JWT_SECRET = (process.env.JWT_SECRET || '').trim();
 const JWT_EXPIRES_SECONDS = Number(process.env.JWT_EXPIRES_SECONDS) || 86400;
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').toLowerCase().trim();
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+const ADMIN_LOGIN_CONFIGURED =
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ADMIN_EMAIL) &&
+    ADMIN_PASSWORD.length >= 16;
 
 function base64UrlEncode(strOrBuffer) {
     return Buffer.from(strOrBuffer)
@@ -115,6 +121,40 @@ function exigirAutenticacion(req, res, next) {
     next();
 }
 
+function exigirAdmin(req, res, next) {
+    if (!req.usuario) {
+        return res.status(401).json({
+            status: 'error',
+            message: 'Inicia sesión para acceder a este recurso.'
+        });
+    }
+    if (req.usuario.rol !== 'ADMIN') {
+        return res.status(403).json({
+            status: 'error',
+            message: 'Este recurso está reservado para administradores.'
+        });
+    }
+    next();
+}
+
+function exigirRoles(...roles) {
+    return (req, res, next) => {
+        if (!req.usuario) {
+            return res.status(401).json({
+                status: 'error',
+                message: 'Inicia sesión para acceder a este recurso.'
+            });
+        }
+        if (!roles.includes(req.usuario.rol)) {
+            return res.status(403).json({
+                status: 'error',
+                message: 'Tu cuenta no tiene permisos para realizar esta acción.'
+            });
+        }
+        next();
+    };
+}
+
 async function llamarMicroservicio(baseUrl, method, pathConQuery, body = undefined) {
     const url = `${baseUrl}${pathConQuery.startsWith('/') ? pathConQuery : '/' + pathConQuery}`;
     const opciones = {
@@ -143,13 +183,13 @@ async function llamarMicroservicio(baseUrl, method, pathConQuery, body = undefin
     return { status: respuesta.status, data: json };
 }
 
-async function reenviarA(baseUrl, req, res, bodyOverride = undefined) {
+async function reenviarA(baseUrl, req, res, bodyOverride = undefined, pathOverride = req.originalUrl) {
     try {
         const bodyAEnviar = bodyOverride !== undefined
             ? bodyOverride
             : (['GET', 'HEAD'].includes(req.method) ? undefined : req.body);
 
-        const resultado = await llamarMicroservicio(baseUrl, req.method, req.originalUrl, bodyAEnviar);
+        const resultado = await llamarMicroservicio(baseUrl, req.method, pathOverride, bodyAEnviar);
         if (resultado.status === 204 || resultado.data === null) {
             return res.status(resultado.status).end();
         }
@@ -160,6 +200,135 @@ async function reenviarA(baseUrl, req, res, bodyOverride = undefined) {
             status: 'error',
             message: 'El microservicio correspondiente no está disponible en este momento'
         });
+    }
+}
+
+async function obtenerProyectosCliente(clienteId, res) {
+    const proyectos = [];
+    let offset = 0;
+    let total = 0;
+
+    try {
+        do {
+            const pagina = await llamarMicroservicio(
+                PYTHON_API_URL,
+                'GET',
+                `/proyectos?cliente=${clienteId}&limit=100&offset=${offset}`
+            );
+            if (pagina.status !== 200 || !pagina.data || !Array.isArray(pagina.data.items)) {
+                res.status(pagina.status).json(pagina.data);
+                return null;
+            }
+            if (pagina.data.items.length === 0) {
+                break;
+            }
+            proyectos.push(...pagina.data.items);
+            total = Number(pagina.data.total) || 0;
+            offset += pagina.data.items.length;
+        } while (offset < total);
+        return proyectos;
+    } catch (error) {
+        console.error(`Error consultando proyectos del cliente ${clienteId}:`, error.message);
+        res.status(502).json({
+            status: 'error',
+            message: 'El servicio de proyectos (Python) no está disponible'
+        });
+        return null;
+    }
+}
+
+async function obtenerAsignacionesPropias(req, res) {
+    if (req.usuario.rol === 'TRABAJADOR') {
+        try {
+            const resultado = await llamarMicroservicio(
+                EXPRESS_API_URL,
+                'GET',
+                `/asignaciones?trabajador_id=${req.usuario.id}`
+            );
+            if (resultado.status !== 200) {
+                res.status(resultado.status).json(resultado.data);
+                return null;
+            }
+            return resultado.data.data;
+        } catch (error) {
+            console.error('Error consultando asignaciones del trabajador:', error.message);
+            res.status(502).json({ status: 'error', message: 'El servicio de asignaciones no está disponible' });
+            return null;
+        }
+    }
+    if (req.usuario.rol !== 'CLIENTE') {
+        return [];
+    }
+
+    const proyectos = await obtenerProyectosCliente(req.usuario.id, res);
+    if (proyectos === null) {
+        return null;
+    }
+    try {
+        const resultados = await Promise.all(proyectos.map(proyecto =>
+            llamarMicroservicio(EXPRESS_API_URL, 'GET', `/asignaciones?proyecto_id=${proyecto.id}`)
+        ));
+        const fallo = resultados.find(resultado => resultado.status !== 200);
+        if (fallo) {
+            res.status(fallo.status).json(fallo.data);
+            return null;
+        }
+        return resultados.flatMap(resultado => resultado.data.data);
+    } catch (error) {
+        console.error('Error consultando asignaciones del cliente:', error.message);
+        res.status(502).json({ status: 'error', message: 'El servicio de asignaciones no está disponible' });
+        return null;
+    }
+}
+
+async function autorizarAsignacion(req, res, rolesPermitidos) {
+    if (!req.usuario) {
+        res.status(401).json({ status: 'error', message: 'Inicia sesión para acceder a este recurso.' });
+        return null;
+    }
+    if (req.usuario.rol === 'ADMIN') {
+        return true;
+    }
+    if (!rolesPermitidos.includes(req.usuario.rol)) {
+        res.status(403).json({ status: 'error', message: 'Tu cuenta no tiene permisos para realizar esta acción.' });
+        return null;
+    }
+
+    try {
+        const resultado = await llamarMicroservicio(
+            EXPRESS_API_URL,
+            'GET',
+            `/asignaciones/${req.params.id}`
+        );
+        if (resultado.status !== 200 || !resultado.data || !resultado.data.data) {
+            res.status(resultado.status).json(resultado.data);
+            return null;
+        }
+        const asignacion = resultado.data.data;
+
+        if (req.usuario.rol === 'TRABAJADOR' && Number(asignacion.trabajador_id) === req.usuario.id) {
+            return true;
+        }
+        if (req.usuario.rol === 'CLIENTE') {
+            const proyecto = await llamarMicroservicio(
+                PYTHON_API_URL,
+                'GET',
+                `/proyectos/${asignacion.proyecto_id}`
+            );
+            if (proyecto.status !== 200 || !proyecto.data) {
+                res.status(proyecto.status).json(proyecto.data);
+                return null;
+            }
+            if (Number(proyecto.data.cliente_id) === req.usuario.id) {
+                return true;
+            }
+        }
+        res.status(403).json({ status: 'error', message: 'No tienes acceso a esta asignación.' });
+        return null;
+    } catch (error) {
+        console.error(`Error verificando la asignación ${req.params.id}:`, error.message);
+        res.status(502).json({ status: 'error', message: 'No se pudo verificar el acceso a la asignación.' });
+        return null;
     }
 }
 
@@ -203,6 +372,44 @@ app.get('/health', async (req, res) => {
     });
 });
 
+function esCredencialAdmin(email, password) {
+    if (!ADMIN_LOGIN_CONFIGURED || typeof email !== 'string' || typeof password !== 'string') {
+        return false;
+    }
+
+    const contrasenaRecibida = Buffer.from(password);
+    const contrasenaConfigurada = Buffer.from(ADMIN_PASSWORD);
+    return email.toLowerCase().trim() === ADMIN_EMAIL &&
+        contrasenaRecibida.length === contrasenaConfigurada.length &&
+        crypto.timingSafeEqual(contrasenaRecibida, contrasenaConfigurada);
+}
+
+function generarSesionAdmin() {
+    const adminUser = {
+        id: 0,
+        nombre: 'Administrador',
+        email: ADMIN_EMAIL,
+        telefono: null,
+        rol: 'ADMIN',
+        fecha_registro: new Date().toISOString(),
+        perfil: {
+            cargo: 'Administrador de la plataforma'
+        }
+    };
+    const token = firmarJWT({
+        sub: '0',
+        rol: 'ADMIN',
+        nombre: adminUser.nombre,
+        email: adminUser.email
+    });
+    return {
+        status: 'success',
+        message: 'Acceso de Administrador autorizado',
+        token,
+        usuario: adminUser
+    };
+}
+
 async function manejarLogin(req, res) {
     try {
         const respuestaLogin = await llamarMicroservicio(PHP_API_URL, 'POST', '/login', req.body);
@@ -232,6 +439,24 @@ async function manejarLogin(req, res) {
         });
     }
 }
+
+app.post('/auth/admin-login', (req, res) => {
+    if (!ADMIN_LOGIN_CONFIGURED) {
+        return res.status(503).json({
+            status: 'error',
+            message: 'El acceso de administrador no está configurado. Define ADMIN_EMAIL y una ADMIN_PASSWORD de al menos 16 caracteres en el archivo .env del Gateway.'
+        });
+    }
+
+    const { email, password } = req.body || {};
+    if (esCredencialAdmin(email, password)) {
+        return res.status(200).json(generarSesionAdmin());
+    }
+    return res.status(401).json({
+        status: 'error',
+        message: 'Correo o contraseña de administrador incorrectos.'
+    });
+});
 
 app.post('/auth/login', manejarLogin);
 app.post('/login', manejarLogin);
@@ -320,6 +545,18 @@ app.post('/auth/registro', async (req, res) => {
 });
 
 app.get('/auth/me', exigirAutenticacion, async (req, res) => {
+    if (req.usuario.rol === 'ADMIN') {
+        return res.json({
+            status: 'success',
+            data: {
+                id: req.usuario.id,
+                nombre: req.usuario.nombre,
+                email: req.usuario.email,
+                rol: req.usuario.rol
+            }
+        });
+    }
+
     try {
         const resUsuario = await llamarMicroservicio(PHP_API_URL, 'GET', `/usuarios/${req.usuario.id}`);
         if (resUsuario.status !== 200) {
@@ -343,29 +580,149 @@ app.get('/auth/me', exigirAutenticacion, async (req, res) => {
     }
 });
 
-app.use(['/usuarios', '/clientes', '/trabajadores'], (req, res) => {
+app.use(['/usuarios', '/clientes'], exigirAdmin, (req, res) => {
     return reenviarA(PHP_API_URL, req, res);
 });
 
-app.post('/proyectos', (req, res) => {
-    const body = { ...(req.body || {}) };
-    if (body.cliente_id === undefined && body.usuario_id === undefined && req.usuario && req.usuario.rol === 'CLIENTE') {
-        body.cliente_id = req.usuario.id;
+app.get('/trabajadores', async (req, res) => {
+    try {
+        const resultado = await llamarMicroservicio(PHP_API_URL, 'GET', '/trabajadores');
+        if (resultado.status !== 200 || !resultado.data || !Array.isArray(resultado.data.data)) {
+            return res.status(resultado.status).json(resultado.data);
+        }
+        const data = resultado.data.data.map(({ email, telefono, fecha_registro, ...perfil }) => perfil);
+        return res.json({ ...resultado.data, data });
+    } catch (error) {
+        console.error('Error cargando el directorio de talento:', error.message);
+        return res.status(502).json({
+            status: 'error',
+            message: 'El servicio de usuarios (PHP) no está disponible'
+        });
     }
+});
+app.get('/trabajadores/:id', exigirAutenticacion, (req, res, next) => {
+    if (req.usuario.rol !== 'ADMIN' && req.usuario.id !== Number(req.params.id)) {
+        return res.status(403).json({ status: 'error', message: 'No puedes consultar el perfil privado de otro usuario.' });
+    }
+    return reenviarA(PHP_API_URL, req, res);
+});
+app.use('/trabajadores', exigirAdmin, (req, res) => reenviarA(PHP_API_URL, req, res));
+
+app.use('/proyectos/:id', (req, res, next) => {
+    if (['PATCH', 'DELETE'].includes(req.method)) {
+        return exigirAdmin(req, res, next);
+    }
+    next();
+});
+
+app.post('/proyectos', exigirRoles('CLIENTE'), (req, res) => {
+    const body = { ...(req.body || {}) };
+    body.cliente_id = req.usuario.id;
+    delete body.usuario_id;
     return reenviarA(PYTHON_API_URL, req, res, body);
 });
 
-app.post('/proyectos/:id/postulaciones', (req, res) => {
+app.post('/proyectos/:id/postulaciones', exigirRoles('TRABAJADOR'), (req, res) => {
     const body = { ...(req.body || {}) };
-    if (body.trabajador_id === undefined && body.usuario_id === undefined && req.usuario && req.usuario.rol === 'TRABAJADOR') {
-        body.trabajador_id = req.usuario.id;
-    }
+    body.trabajador_id = req.usuario.id;
+    delete body.usuario_id;
     return reenviarA(PYTHON_API_URL, req, res, body);
 });
 
-app.patch('/postulaciones/:id', async (req, res) => {
+app.get('/postulaciones', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), async (req, res) => {
+    try {
+        const resultado = await llamarMicroservicio(PYTHON_API_URL, 'GET', '/postulaciones');
+        if (resultado.status !== 200 || !Array.isArray(resultado.data)) {
+            return res.status(resultado.status).json(resultado.data);
+        }
+        if (req.usuario.rol === 'ADMIN') {
+            return res.json(resultado.data);
+        }
+        if (req.usuario.rol === 'TRABAJADOR') {
+            return res.json(resultado.data.filter(post => Number(post.trabajador_id) === req.usuario.id));
+        }
+
+        const postulaciones = resultado.data;
+        const proyectosPropios = new Set();
+        let offset = 0;
+        let total = 0;
+        do {
+            const pagina = await llamarMicroservicio(
+                PYTHON_API_URL,
+                'GET',
+                `/proyectos?cliente=${req.usuario.id}&limit=100&offset=${offset}`
+            );
+            if (pagina.status !== 200 || !pagina.data || !Array.isArray(pagina.data.items)) {
+                return res.status(pagina.status).json(pagina.data);
+            }
+            pagina.data.items.forEach(proyecto => proyectosPropios.add(Number(proyecto.id)));
+            total = Number(pagina.data.total) || 0;
+            offset += pagina.data.items.length;
+        } while (offset < total && offset > 0);
+        return res.json(postulaciones.filter(post => proyectosPropios.has(Number(post.proyecto_id))));
+    } catch (error) {
+        console.error('Error cargando postulaciones:', error.message);
+        return res.status(502).json({
+            status: 'error',
+            message: 'El servicio de proyectos (Python) no está disponible'
+        });
+    }
+});
+
+app.get('/proyectos/:id/postulaciones', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), async (req, res) => {
+    try {
+        const proyecto = await llamarMicroservicio(PYTHON_API_URL, 'GET', `/proyectos/${req.params.id}`);
+        if (proyecto.status !== 200 || !proyecto.data) {
+            return res.status(proyecto.status).json(proyecto.data);
+        }
+        if (req.usuario.rol === 'CLIENTE' && Number(proyecto.data.cliente_id) !== req.usuario.id) {
+            return res.status(403).json({ status: 'error', message: 'No puedes ver las propuestas de otro cliente.' });
+        }
+        const resultado = await llamarMicroservicio(
+            PYTHON_API_URL,
+            'GET',
+            `/proyectos/${req.params.id}/postulaciones`
+        );
+        if (resultado.status !== 200 || !Array.isArray(resultado.data)) {
+            return res.status(resultado.status).json(resultado.data);
+        }
+        if (req.usuario.rol === 'TRABAJADOR') {
+            return res.json(resultado.data.filter(post => Number(post.trabajador_id) === req.usuario.id));
+        }
+        return res.json(resultado.data);
+    } catch (error) {
+        console.error(`Error cargando propuestas del proyecto ${req.params.id}:`, error.message);
+        return res.status(502).json({
+            status: 'error',
+            message: 'El servicio de proyectos (Python) no está disponible'
+        });
+    }
+});
+
+app.patch('/postulaciones/:id', exigirRoles('CLIENTE', 'ADMIN'), async (req, res) => {
     try {
         const body = req.body || {};
+        if (req.usuario.rol !== 'ADMIN') {
+            const resultadoPostulaciones = await llamarMicroservicio(PYTHON_API_URL, 'GET', '/postulaciones');
+            if (resultadoPostulaciones.status !== 200 || !Array.isArray(resultadoPostulaciones.data)) {
+                return res.status(resultadoPostulaciones.status).json(resultadoPostulaciones.data);
+            }
+            const postulacion = resultadoPostulaciones.data.find(post => Number(post.id) === Number(req.params.id));
+            if (!postulacion) {
+                return res.status(404).json({ status: 'error', message: 'Postulación no encontrada.' });
+            }
+            const proyecto = await llamarMicroservicio(
+                PYTHON_API_URL,
+                'GET',
+                `/proyectos/${postulacion.proyecto_id}`
+            );
+            if (proyecto.status !== 200 || !proyecto.data) {
+                return res.status(proyecto.status).json(proyecto.data);
+            }
+            if (Number(proyecto.data.cliente_id) !== req.usuario.id) {
+                return res.status(403).json({ status: 'error', message: 'Solo el cliente propietario puede responder a esta propuesta.' });
+            }
+        }
         const resPython = await llamarMicroservicio(
             PYTHON_API_URL,
             'PATCH',
@@ -388,9 +745,21 @@ app.patch('/postulaciones/:id', async (req, res) => {
                 });
                 if (resAsignacion.status === 201) {
                     postulacion.asignacion_id = resAsignacion.data.id;
+                } else {
+                    console.error(
+                        `Postulación ${postulacion.id} fue aceptada, pero la asignación no se creó (HTTP ${resAsignacion.status}).`
+                    );
+                    return res.status(502).json({
+                        status: 'error',
+                        message: 'La propuesta fue aceptada, pero no se pudo crear su asignación. Revisa el estado antes de volver a intentarlo.'
+                    });
                 }
             } catch (errExpress) {
-                console.warn('No se pudo crear automáticamente la asignación en Express:', errExpress.message);
+                console.error('La propuesta fue aceptada, pero falló la creación de su asignación:', errExpress.message);
+                return res.status(502).json({
+                    status: 'error',
+                    message: 'La propuesta fue aceptada, pero no se pudo conectar con el servicio de asignaciones. Revisa el estado antes de volver a intentarlo.'
+                });
             }
         }
 
@@ -408,17 +777,135 @@ app.use(['/proyectos', '/postulaciones'], (req, res) => {
     return reenviarA(PYTHON_API_URL, req, res);
 });
 
-app.post('/facturas', (req, res) => {
-    const body = { ...(req.body || {}) };
-    if (body.trabajador_id === undefined && body.idUsuario === undefined && req.usuario && req.usuario.rol === 'TRABAJADOR') {
-        body.trabajador_id = req.usuario.id;
+app.use('/facturas', exigirAutenticacion);
+
+app.get('/facturas', async (req, res) => {
+    const url = new URL(req.originalUrl, 'http://localhost');
+    if (req.usuario.rol === 'CLIENTE') {
+        url.searchParams.set('cliente_id', String(req.usuario.id));
+        url.searchParams.delete('trabajador_id');
+    } else if (req.usuario.rol === 'TRABAJADOR') {
+        url.searchParams.set('trabajador_id', String(req.usuario.id));
+        url.searchParams.delete('cliente_id');
     }
+    return reenviarA(EXPRESS_API_URL, req, res, undefined, url.pathname + url.search);
+});
+
+app.post('/facturas', exigirRoles('TRABAJADOR'), (req, res) => {
+    const body = { ...(req.body || {}) };
+    body.trabajador_id = req.usuario.id;
+    delete body.idUsuario;
     return reenviarA(EXPRESS_API_URL, req, res, body);
 });
 
-app.use(['/asignaciones', '/registros-tiempo', '/facturas'], (req, res) => {
+app.get('/asignaciones', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), async (req, res) => {
+    if (req.usuario.rol === 'ADMIN') {
+        return reenviarA(EXPRESS_API_URL, req, res);
+    }
+    const asignaciones = await obtenerAsignacionesPropias(req, res);
+    if (asignaciones === null) {
+        return;
+    }
+    return res.json({ status: 'success', data: asignaciones });
+});
+
+app.get('/asignaciones/:id', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), async (req, res) => {
+    if (await autorizarAsignacion(req, res, ['TRABAJADOR', 'CLIENTE']) === null) {
+        return;
+    }
     return reenviarA(EXPRESS_API_URL, req, res);
 });
+
+app.post('/asignaciones', exigirRoles('CLIENTE'), async (req, res) => {
+    const proyectoId = Number(req.body?.proyecto_id);
+    if (!Number.isSafeInteger(proyectoId) || proyectoId <= 0) {
+        return res.status(400).json({ status: 'error', message: 'Selecciona un proyecto válido.' });
+    }
+    try {
+        const proyecto = await llamarMicroservicio(PYTHON_API_URL, 'GET', `/proyectos/${proyectoId}`);
+        if (proyecto.status !== 200 || !proyecto.data) {
+            return res.status(proyecto.status).json(proyecto.data);
+        }
+        if (Number(proyecto.data.cliente_id) !== req.usuario.id) {
+            return res.status(403).json({ status: 'error', message: 'Solo el cliente propietario puede crear una asignación.' });
+        }
+        return reenviarA(EXPRESS_API_URL, req, res);
+    } catch (error) {
+        console.error('Error verificando la propiedad del proyecto:', error.message);
+        return res.status(502).json({ status: 'error', message: 'No se pudo verificar el proyecto.' });
+    }
+});
+
+app.get('/asignaciones/:id/registros-tiempo', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), async (req, res) => {
+    if (await autorizarAsignacion(req, res, ['TRABAJADOR', 'CLIENTE']) === null) {
+        return;
+    }
+    return reenviarA(EXPRESS_API_URL, req, res);
+});
+
+app.get('/asignaciones/:id/calcular-valor', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), async (req, res) => {
+    if (await autorizarAsignacion(req, res, ['TRABAJADOR', 'CLIENTE']) === null) {
+        return;
+    }
+    return reenviarA(EXPRESS_API_URL, req, res);
+});
+
+app.post('/asignaciones/:id/horas-manuales', exigirRoles('TRABAJADOR'), async (req, res) => {
+    if (await autorizarAsignacion(req, res, ['TRABAJADOR']) === null) {
+        return;
+    }
+    return reenviarA(EXPRESS_API_URL, req, res);
+});
+
+app.patch('/asignaciones/:id/iniciar-temporizador', exigirRoles('TRABAJADOR'), async (req, res) => {
+    if (await autorizarAsignacion(req, res, ['TRABAJADOR']) === null) {
+        return;
+    }
+    return reenviarA(EXPRESS_API_URL, req, res);
+});
+
+app.patch('/asignaciones/:id/detener-temporizador', exigirRoles('TRABAJADOR'), async (req, res) => {
+    if (await autorizarAsignacion(req, res, ['TRABAJADOR']) === null) {
+        return;
+    }
+    return reenviarA(EXPRESS_API_URL, req, res);
+});
+
+app.patch('/asignaciones/:id', exigirAdmin, (req, res) => reenviarA(EXPRESS_API_URL, req, res));
+app.delete('/asignaciones/:id', exigirAdmin, (req, res) => reenviarA(EXPRESS_API_URL, req, res));
+
+app.get('/registros-tiempo', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), async (req, res) => {
+    if (req.usuario.rol === 'ADMIN') {
+        return reenviarA(EXPRESS_API_URL, req, res);
+    }
+    const asignaciones = await obtenerAsignacionesPropias(req, res);
+    if (asignaciones === null) {
+        return;
+    }
+    try {
+        const resultados = await Promise.all(asignaciones.map(asignacion =>
+            llamarMicroservicio(EXPRESS_API_URL, 'GET', `/asignaciones/${asignacion.id}/registros-tiempo`)
+        ));
+        const fallo = resultados.find(resultado => resultado.status !== 200);
+        if (fallo) {
+            return res.status(fallo.status).json(fallo.data);
+        }
+        return res.json({
+            status: 'success',
+            data: resultados.flatMap(resultado => resultado.data.data)
+        });
+    } catch (error) {
+        console.error('Error consultando registros de tiempo:', error.message);
+        return res.status(502).json({ status: 'error', message: 'El servicio de registros de tiempo no está disponible' });
+    }
+});
+
+app.patch('/registros-tiempo/:id/aprobar', exigirAdmin, (req, res) => reenviarA(EXPRESS_API_URL, req, res));
+app.delete('/registros-tiempo/:id', exigirAdmin, (req, res) => reenviarA(EXPRESS_API_URL, req, res));
+app.use('/facturas/:id/estado', exigirAdmin, (req, res) => reenviarA(EXPRESS_API_URL, req, res));
+app.use('/facturas/:id', exigirAdmin, (req, res) => reenviarA(EXPRESS_API_URL, req, res));
+app.use('/asignaciones', exigirAdmin, (req, res) => reenviarA(EXPRESS_API_URL, req, res));
+app.use('/registros-tiempo', exigirAdmin, (req, res) => reenviarA(EXPRESS_API_URL, req, res));
 
 app.use((req, res) => {
     res.status(404).json({
@@ -428,6 +915,16 @@ app.use((req, res) => {
 });
 
 if (require.main === module) {
+    if (INTERNAL_API_KEY.length < 32) {
+        throw new Error('Configura INTERNAL_API_KEY con al menos 32 caracteres en el archivo .env del Gateway.');
+    }
+    if (JWT_SECRET.length < 32) {
+        throw new Error('Configura JWT_SECRET con al menos 32 caracteres en el archivo .env del Gateway.');
+    }
+    if (!ADMIN_LOGIN_CONFIGURED) {
+        console.warn('Acceso administrador deshabilitado: configura ADMIN_EMAIL y una ADMIN_PASSWORD de al menos 16 caracteres.');
+    }
+
     app.listen(PORT, () => {
         console.log(`API Gateway corriendo en http://localhost:${PORT}`);
     });

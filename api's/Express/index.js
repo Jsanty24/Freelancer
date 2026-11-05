@@ -19,7 +19,7 @@ const db = mysql.createPool({
 
 const ESTADOS_FACTURA_VALIDOS = ['PENDIENTE', 'APROBADA', 'RECHAZADA', 'PAGADA'];
 const ESTADOS_TIEMPO_VALIDOS = ['PENDIENTE', 'APROBADO', 'CONGELADO'];
-const INTERNAL_API_KEY = (process.env.INTERNAL_API_KEY || 'clave-interna-gateway-freelancer-2026').trim();
+const INTERNAL_API_KEY = (process.env.INTERNAL_API_KEY || '').trim();
 
 // =========================================================================
 // SALUD DEL SERVICIO Y PROTECCIÓN INTERNA (SOLO GATEWAY)
@@ -28,8 +28,48 @@ app.get('/', (req, res) => {
     res.json({ status: 'ok', service: 'API Tiempo y Facturacion (Express)' });
 });
 
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok', service: 'API Tiempo y Facturacion (Express)' });
+app.get('/health', async (req, res) => {
+    try {
+        await db.query('SELECT 1');
+        const [columnas] = await db.query(
+            `SELECT TABLE_NAME, COLUMN_NAME
+             FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME IN ('asignaciones', 'proyectos', 'registros_tiempo', 'facturas')`
+        );
+        const esquema = new Map();
+        columnas.forEach(({ TABLE_NAME, COLUMN_NAME }) => {
+            if (!esquema.has(TABLE_NAME)) {
+                esquema.set(TABLE_NAME, new Set());
+            }
+            esquema.get(TABLE_NAME).add(COLUMN_NAME);
+        });
+        const requeridas = {
+            asignaciones: ['id', 'trabajador_id', 'proyecto_id', 'rol_en_proyecto', 'tarifa_por_hora'],
+            proyectos: ['cliente_id'],
+            registros_tiempo: ['id', 'asignacion_id', 'inicio', 'fin', 'horas', 'estado'],
+            facturas: ['id', 'cliente_id', 'trabajador_id', 'fecha_emision', 'valor_total', 'estado_factura']
+        };
+        const columnasFaltantes = Object.entries(requeridas).flatMap(([tabla, columnasTabla]) =>
+            columnasTabla.filter(columna => !esquema.get(tabla)?.has(columna)).map(columna => `${tabla}.${columna}`)
+        );
+        if (columnasFaltantes.length > 0) {
+            console.error('GET /health: el esquema necesita migración. Columnas faltantes:', columnasFaltantes);
+            return res.status(503).json({
+                status: 'error',
+                service: 'API Tiempo y Facturacion (Express)',
+                database: 'schema_migration_required'
+            });
+        }
+        res.json({ status: 'ok', service: 'API Tiempo y Facturacion (Express)', database: 'ok' });
+    } catch (error) {
+        console.error('GET /health: no se pudo consultar la base de datos:', error.message);
+        res.status(503).json({
+            status: 'error',
+            service: 'API Tiempo y Facturacion (Express)',
+            database: 'unavailable'
+        });
+    }
 });
 
 app.use((req, res, next) => {
@@ -37,7 +77,7 @@ app.use((req, res, next) => {
         return next();
     }
     const claveRecibida = req.header('X-Internal-Key') || '';
-    if (claveRecibida !== INTERNAL_API_KEY) {
+    if (!INTERNAL_API_KEY || claveRecibida !== INTERNAL_API_KEY) {
         return res.status(403).json({
             status: 'error',
             message: 'Acceso directo no permitido; use el API Gateway'

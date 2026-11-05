@@ -1,6 +1,6 @@
 <?php
 
-require_once __DIR__ . '/baseDatos/bd.php';
+require_once __DIR__ . '/config/conexion.php';
 
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Origin: *");
@@ -35,11 +35,38 @@ try {
     $id = null;
 
     if ($recurso === 'health') {
-        responder(200, ["status" => "ok", "service" => "API Usuarios (PHP)"]);
+        $database = new Database();
+        $connection = $database->getConnection();
+        if (!$connection) {
+            responder(503, [
+                "status" => "error",
+                "service" => "API Usuarios (PHP)",
+                "database" => "unavailable"
+            ]);
+        }
+
+        try {
+            $connection->query(
+                "SELECT u.id, u.rol, u.password_hash
+                 FROM usuarios u
+                 LEFT JOIN clientes c ON c.usuario_id = u.id
+                 LEFT JOIN trabajadores t ON t.usuario_id = u.id
+                 LIMIT 0"
+            );
+        } catch (PDOException $e) {
+            error_log("GET /health: el esquema de usuarios requiere una migracion: " . $e->getMessage());
+            responder(503, [
+                "status" => "error",
+                "service" => "API Usuarios (PHP)",
+                "database" => "schema_migration_required"
+            ]);
+        }
+
+        responder(200, ["status" => "ok", "service" => "API Usuarios (PHP)", "database" => "ok"]);
     }
 
     $internalKey = $_SERVER['HTTP_X_INTERNAL_KEY'] ?? '';
-    if (!hash_equals(INTERNAL_API_KEY, (string) $internalKey)) {
+    if (INTERNAL_API_KEY === '' || !hash_equals(INTERNAL_API_KEY, (string) $internalKey)) {
         responder(403, [
             "status" => "error",
             "message" => "Acceso directo no permitido; use el API Gateway"
