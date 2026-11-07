@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Freelancer — Plataforma de trabajo freelance</title>
-  <link rel="icon" type="image/svg+xml" href="./public/favicon.svg"/>
+  <link rel="icon" type="image/svg+xml" href="./public/logo-principal.svg"/>
 
   <!-- Google Fonts: Google Sans (Principal) & Google Sans Flex (Navegación e Interfaz) & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -43,9 +43,7 @@
         </button>
 
         <a href="#marketplace" class="flex items-center gap-2.5 group">
-          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-700 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md group-hover:scale-105 transition-transform">
-            F
-          </div>
+          <img src="./public/logo-principal.svg" alt="" class="w-9 h-9 rounded-xl shadow-md group-hover:scale-105 transition-transform"/>
           <span class="text-xl font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-violet-600 transition-colors">
             Freelancer
           </span>
@@ -148,7 +146,7 @@
       <div>
         <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100 dark:border-slate-800">
           <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-lg bg-violet-700 text-white font-bold flex items-center justify-center text-sm">F</div>
+            <img src="./public/logo-principal.svg" alt="" class="w-8 h-8 rounded-lg"/>
             <span class="font-bold text-base text-slate-900 dark:text-white">Menú Freelancer</span>
           </div>
           <button onclick="window.App.cerrarMenuMovil()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
@@ -263,7 +261,9 @@
   <footer class="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-6 mt-auto">
     <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
       <div class="flex items-center gap-2">
-        <span class="font-bold text-slate-800 dark:text-white">Freelancer</span>
+        <span class="inline-flex items-center gap-2 font-bold text-slate-800 dark:text-white">
+          <img src="./public/logo-principal.svg" alt="" class="w-6 h-6 rounded-md"/> Freelancer
+        </span>
         <span>•</span>
         <span>Plataforma Full-Stack con Microservicios en PHP, Python FastAPI, Express & Gateway</span>
       </div>
@@ -419,7 +419,7 @@
     <div class="modal-window p-6 max-w-md">
       <div class="flex items-start justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
         <div class="flex items-center gap-2">
-          <div class="w-8 h-8 rounded-lg bg-violet-700 text-white flex items-center justify-center font-bold">F</div>
+          <img src="./public/logo-principal.svg" alt="" class="w-8 h-8 rounded-lg"/>
           <div>
             <h3 class="text-base font-bold text-slate-900 dark:text-white">Iniciar Sesión</h3>
             <p class="text-xs text-slate-500">Autenticación con JWT sobre microservicio PHP</p>
@@ -647,6 +647,7 @@
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
 
   <!-- ================= SCRIPTS DE LA APLICACIÓN ================= -->
+  <script src="./js/config.js"></script>
   <script src="./js/api.js"></script>
   <script src="./js/state.js"></script>
   <script src="./js/timer.js"></script>

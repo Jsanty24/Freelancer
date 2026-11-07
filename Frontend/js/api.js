@@ -3,7 +3,15 @@
  * Todos los llamados HTTP se realizan exclusivamente a través de la función nativa fetch()
  */
 
-const API_BASE = window.location.origin;
+const esCapacitorNativo = Boolean(
+  window.Capacitor &&
+  typeof window.Capacitor.isNativePlatform === 'function' &&
+  window.Capacitor.isNativePlatform()
+);
+const API_BASE = (
+  window.FREELANCER_API_BASE ||
+  (esCapacitorNativo ? 'http://10.0.2.2:4000' : window.location.origin)
+).replace(/\/+$/, '');
 
 class ApiClient {
   constructor() {

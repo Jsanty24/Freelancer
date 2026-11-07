@@ -1,0 +1,9 @@
+{
+  "appId": "com.freelancer.platform",
+  "appName": "Freelancer",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  }
+}

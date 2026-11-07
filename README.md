@@ -78,9 +78,26 @@ Al finalizar, el script indica qué puertos respondieron y consulta el estado de
 *   **Panel de Control Principal del Frontend:** `http://localhost:4000/`
 *   **Verificación de Salud del Gateway:** `http://localhost:4000/health`
 
-### Base de datos existente
+### Aplicación híbrida Android (Capacitor)
 
-La aplicación necesita que el esquema de MariaDB coincida con los servicios PHP, Python y Express. El script de inicio no ejecuta migraciones ni sobrescribe datos. **No ejecutes `Backend/schemas.sql` sobre una base existente:** contiene instrucciones que borran la base de datos. Tampoco ejecutes `api's/Python/migracion_bd.sql`: es una migración antigua que crea perfiles con datos inventados y usa columnas y estados incompatibles con el modelo actual. Consulta [MIGRACION_PLAN.md](./MIGRACION_PLAN.md) antes de migrar; primero prepara y verifica un respaldo y confirma los mapeos pendientes.
+La carpeta `AndroidApp/` contiene el proyecto Capacitor para reutilizar la interfaz web dentro de una aplicación Android. Requiere Node.js, Android Studio con Android SDK y un emulador Android o dispositivo conectado.
+
+```powershell
+cd AndroidApp
+npm install
+npm run android:add   # Solo la primera vez: crea el proyecto Android
+npm run open:android  # Copia la interfaz y abre Android Studio
+```
+
+Para ejecutar en un emulador con Android Studio, inicia el backend en el computador con `iniciar_todo.ps1` y pulsa Run en Android Studio. El emulador usa `http://10.0.2.2:4000` para alcanzar el Gateway local. En un teléfono físico, cambia `window.FREELANCER_API_BASE` en `Frontend/js/config.js` a `http://<IP-LAN-del-computador>:4000` y vuelve a sincronizar con `npm run sync`. El HTTP sin cifrar solo está habilitado para desarrollo local; para distribuir la app se debe usar un Gateway HTTPS.
+
+Después de la primera creación, `npm run sync` actualiza la copia de la web y los recursos nativos. La interfaz y los formularios se renderizan en el WebView de Android mediante Capacitor; esto es una app **híbrida**, no una interfaz nativa reescrita en Kotlin. La configuración no incluye todavía un APK firmado ni publicación en una tienda.
+
+### Base de datos de demostración y base original
+
+Los servicios locales apuntan a la base vacía `plataforma_freelance_demo`, creada con las tablas del modelo actual para poder probar la aplicación sin alterar datos preexistentes. Registra cuentas de prueba desde la interfaz si necesitas datos de demostración. La base original `plataforma_freelance` permanece intacta y no se migró.
+
+El script de inicio no ejecuta migraciones ni sobrescribe datos. **No ejecutes `Backend/schemas.sql` sobre una base existente:** contiene instrucciones que borran la base de datos. Tampoco ejecutes `api's/Python/migracion_bd.sql`: es una migración antigua que crea perfiles con datos inventados y usa columnas y estados incompatibles con el modelo actual. Consulta [MIGRACION_PLAN.md](./MIGRACION_PLAN.md) antes de migrar la base original; primero prepara y verifica un respaldo y confirma los mapeos pendientes.
 
 ### Pagos
 
@@ -96,3 +113,7 @@ La plataforma no tiene una pasarela de pago, proveedor de custodia Escrow ni ser
 | `api's/Gateway` | Node.js (Express) | El enrutador central que dirige las solicitudes del frontend a la API backend apropiada. | `http://localhost:4000` |
 | `Frontend/` | HTML, CSS y JavaScript | Interfaz SPA servida por el Gateway. | `http://localhost:4000/` |
 | `Backend/` | SQL | Esquema heredado/base de datos; revisa sus instrucciones antes de ejecutarlas. | N/A |
+
+## Presentación del Momento 3
+
+La guía con la captura del diseño, los formularios, la sustentación tecnológica, el presupuesto y el cronograma está en [PRESENTACION_MOMENTO_3.md](./PRESENTACION_MOMENTO_3.md). La interfaz web responsive también cuenta con un contenedor híbrido Android preparado en `AndroidApp/`.

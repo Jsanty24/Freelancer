@@ -1,0 +1,1 @@
+window.FREELANCER_API_BASE = '';

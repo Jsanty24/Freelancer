@@ -1,7 +1,7 @@
 <?php
 
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'plataforma_freelance');
+define('DB_NAME', getenv('DB_NAME') ?: 'plataforma_freelance_demo');
 define('DB_USER', 'root');
 define('DB_PASS', '');
 define('DB_CHARSET', 'utf8mb4');

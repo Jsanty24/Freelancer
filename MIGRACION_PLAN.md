@@ -1,6 +1,6 @@
 # Plan de migracion de MariaDB
 
-**Estado: respaldo preparado; migracion no aplicada.** El plan evita modificar o reemplazar la base original.
+**Estado: base original conservada sin cambios; migracion de sus datos no aplicada.** Para la demostracion se creo una base separada vacia, `plataforma_freelance_demo`, a partir del modelo actual. Los servicios locales PHP, Python y Express apuntan a esa base de demostracion. No se copiaron ni se modificaron filas de la base original.
 
 ## Respaldo verificado
 
@@ -50,4 +50,4 @@ Antes de importar hacen falta decisiones para cada cuenta (rol, perfil y restabl
 - `Backend/schemas.sql` empieza con `DROP DATABASE IF EXISTS plataforma_freelance`.
 - `api's/Python/migracion_bd.sql` inserta perfiles de cliente con datos de relleno, convierte estados desconocidos a `EN_CURSO`, usa categorias y columnas antiguas, y no coincide con el esquema actual de postulaciones ni de registros de tiempo.
 
-Ninguno de esos scripts se ejecuto. Los health checks de PHP, Python, Express y Gateway continuan reportando que hace falta una migracion.
+Ninguno de esos scripts se ejecuto. Los health checks locales de PHP, Python, Express y Gateway verifican la base de demostracion y responden saludablemente. La base original sigue pendiente de las decisiones de mapeo indicadas arriba; si se vuelve a configurar como destino de los servicios, sus health checks solicitaran migracion.
