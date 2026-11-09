@@ -281,7 +281,7 @@ async function obtenerAsignacionesPropias(req, res) {
     }
 }
 
-async function autorizarAsignacion(req, res, rolesPermitidos) {
+async function autorizarAsignacionPorId(req, res, asignacionId, rolesPermitidos) {
     if (!req.usuario) {
         res.status(401).json({ status: 'error', message: 'Inicia sesión para acceder a este recurso.' });
         return null;
@@ -298,7 +298,7 @@ async function autorizarAsignacion(req, res, rolesPermitidos) {
         const resultado = await llamarMicroservicio(
             EXPRESS_API_URL,
             'GET',
-            `/asignaciones/${req.params.id}`
+            `/asignaciones/${asignacionId}`
         );
         if (resultado.status !== 200 || !resultado.data || !resultado.data.data) {
             res.status(resultado.status).json(resultado.data);
@@ -326,8 +326,85 @@ async function autorizarAsignacion(req, res, rolesPermitidos) {
         res.status(403).json({ status: 'error', message: 'No tienes acceso a esta asignación.' });
         return null;
     } catch (error) {
-        console.error(`Error verificando la asignación ${req.params.id}:`, error.message);
+        console.error(`Error verificando la asignación ${asignacionId}:`, error.message);
         res.status(502).json({ status: 'error', message: 'No se pudo verificar el acceso a la asignación.' });
+        return null;
+    }
+}
+
+async function autorizarAsignacion(req, res, rolesPermitidos) {
+    return autorizarAsignacionPorId(req, res, req.params.id, rolesPermitidos);
+}
+
+async function autorizarRegistroTiempo(req, res, rolesPermitidos) {
+    if (!req.usuario) {
+        res.status(401).json({ status: 'error', message: 'Inicia sesión para acceder a este recurso.' });
+        return null;
+    }
+    if (req.usuario.rol === 'ADMIN') {
+        return true;
+    }
+    if (!rolesPermitidos.includes(req.usuario.rol)) {
+        res.status(403).json({ status: 'error', message: 'Tu cuenta no tiene permisos para realizar esta acción.' });
+        return null;
+    }
+
+    try {
+        const resRegistro = await llamarMicroservicio(
+            EXPRESS_API_URL,
+            'GET',
+            `/registros-tiempo/${req.params.id}`
+        );
+        if (resRegistro.status !== 200 || !resRegistro.data || !resRegistro.data.data) {
+            res.status(resRegistro.status).json(resRegistro.data);
+            return null;
+        }
+        const registro = resRegistro.data.data;
+        return await autorizarAsignacionPorId(req, res, registro.asignacion_id, rolesPermitidos);
+    } catch (error) {
+        console.error(`Error verificando el registro de tiempo ${req.params.id}:`, error.message);
+        res.status(502).json({ status: 'error', message: 'No se pudo verificar el acceso al registro de tiempo.' });
+        return null;
+    }
+}
+
+async function autorizarFactura(req, res, rolesPermitidos) {
+    if (!req.usuario) {
+        res.status(401).json({ status: 'error', message: 'Inicia sesión para acceder a este recurso.' });
+        return null;
+    }
+    if (req.usuario.rol === 'ADMIN') {
+        return true;
+    }
+    if (!rolesPermitidos.includes(req.usuario.rol)) {
+        res.status(403).json({ status: 'error', message: 'Tu cuenta no tiene permisos para realizar esta acción.' });
+        return null;
+    }
+
+    try {
+        const resFactura = await llamarMicroservicio(
+            EXPRESS_API_URL,
+            'GET',
+            `/facturas/${req.params.id}`
+        );
+        if (resFactura.status !== 200 || !resFactura.data || !resFactura.data.data) {
+            res.status(resFactura.status).json(resFactura.data);
+            return null;
+        }
+        const factura = resFactura.data.data;
+
+        if (req.usuario.rol === 'CLIENTE' && Number(factura.cliente_id) === req.usuario.id) {
+            return true;
+        }
+        if (req.usuario.rol === 'TRABAJADOR' && Number(factura.trabajador_id) === req.usuario.id) {
+            return true;
+        }
+
+        res.status(403).json({ status: 'error', message: 'No tienes acceso a esta factura.' });
+        return null;
+    } catch (error) {
+        console.error(`Error verificando la factura ${req.params.id}:`, error.message);
+        res.status(502).json({ status: 'error', message: 'No se pudo verificar el acceso a la factura.' });
         return null;
     }
 }
@@ -777,6 +854,9 @@ app.use(['/proyectos', '/postulaciones'], (req, res) => {
     return reenviarA(PYTHON_API_URL, req, res);
 });
 
+// =========================================================================
+// FACTURAS (GATEWAY -> EXPRESS)
+// =========================================================================
 app.use('/facturas', exigirAutenticacion);
 
 app.get('/facturas', async (req, res) => {
@@ -791,13 +871,39 @@ app.get('/facturas', async (req, res) => {
     return reenviarA(EXPRESS_API_URL, req, res, undefined, url.pathname + url.search);
 });
 
-app.post('/facturas', exigirRoles('TRABAJADOR'), (req, res) => {
+app.post('/facturas', exigirRoles('TRABAJADOR', 'ADMIN'), (req, res) => {
     const body = { ...(req.body || {}) };
-    body.trabajador_id = req.usuario.id;
-    delete body.idUsuario;
+    if (req.usuario.rol === 'TRABAJADOR') {
+        body.trabajador_id = req.usuario.id;
+        delete body.idUsuario;
+    }
     return reenviarA(EXPRESS_API_URL, req, res, body);
 });
 
+app.get('/facturas/:id', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), async (req, res) => {
+    if (await autorizarFactura(req, res, ['TRABAJADOR', 'CLIENTE']) === null) {
+        return;
+    }
+    return reenviarA(EXPRESS_API_URL, req, res);
+});
+
+app.patch(['/facturas/:id/estado', '/facturas/:id'], exigirRoles('CLIENTE', 'ADMIN'), async (req, res) => {
+    if (await autorizarFactura(req, res, ['CLIENTE']) === null) {
+        return;
+    }
+    return reenviarA(EXPRESS_API_URL, req, res);
+});
+
+app.delete('/facturas/:id', exigirRoles('CLIENTE', 'ADMIN'), async (req, res) => {
+    if (await autorizarFactura(req, res, ['CLIENTE']) === null) {
+        return;
+    }
+    return reenviarA(EXPRESS_API_URL, req, res);
+});
+
+// =========================================================================
+// ASIGNACIONES Y TEMPORIZADOR (GATEWAY -> EXPRESS)
+// =========================================================================
 app.get('/asignaciones', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), async (req, res) => {
     if (req.usuario.rol === 'ADMIN') {
         return reenviarA(EXPRESS_API_URL, req, res);
@@ -816,7 +922,10 @@ app.get('/asignaciones/:id', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), asyn
     return reenviarA(EXPRESS_API_URL, req, res);
 });
 
-app.post('/asignaciones', exigirRoles('CLIENTE'), async (req, res) => {
+app.post('/asignaciones', exigirRoles('CLIENTE', 'ADMIN'), async (req, res) => {
+    if (req.usuario.rol === 'ADMIN') {
+        return reenviarA(EXPRESS_API_URL, req, res);
+    }
     const proyectoId = Number(req.body?.proyecto_id);
     if (!Number.isSafeInteger(proyectoId) || proyectoId <= 0) {
         return res.status(400).json({ status: 'error', message: 'Selecciona un proyecto válido.' });
@@ -843,37 +952,58 @@ app.get('/asignaciones/:id/registros-tiempo', exigirRoles('TRABAJADOR', 'CLIENTE
     return reenviarA(EXPRESS_API_URL, req, res);
 });
 
-app.get('/asignaciones/:id/calcular-valor', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), async (req, res) => {
+app.get(['/asignaciones/:id/valor', '/asignaciones/:id/resumen', '/asignaciones/:id/calcular-valor'], exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), async (req, res) => {
     if (await autorizarAsignacion(req, res, ['TRABAJADOR', 'CLIENTE']) === null) {
         return;
     }
     return reenviarA(EXPRESS_API_URL, req, res);
 });
 
-app.post('/asignaciones/:id/horas-manuales', exigirRoles('TRABAJADOR'), async (req, res) => {
+app.post(['/asignaciones/:id/registros-tiempo', '/asignaciones/:id/horas', '/asignaciones/:id/horas-manuales'], exigirRoles('TRABAJADOR', 'ADMIN'), async (req, res) => {
     if (await autorizarAsignacion(req, res, ['TRABAJADOR']) === null) {
         return;
     }
     return reenviarA(EXPRESS_API_URL, req, res);
 });
 
-app.patch('/asignaciones/:id/iniciar-temporizador', exigirRoles('TRABAJADOR'), async (req, res) => {
+app.post(['/asignaciones/:id/temporizador', '/asignaciones/:id/iniciar-temporizador', '/asignaciones/:id/detener-temporizador'], exigirRoles('TRABAJADOR', 'ADMIN'), async (req, res) => {
     if (await autorizarAsignacion(req, res, ['TRABAJADOR']) === null) {
         return;
     }
     return reenviarA(EXPRESS_API_URL, req, res);
 });
 
-app.patch('/asignaciones/:id/detener-temporizador', exigirRoles('TRABAJADOR'), async (req, res) => {
+app.delete('/asignaciones/:id/temporizador', exigirRoles('TRABAJADOR', 'ADMIN'), async (req, res) => {
     if (await autorizarAsignacion(req, res, ['TRABAJADOR']) === null) {
         return;
     }
     return reenviarA(EXPRESS_API_URL, req, res);
 });
 
-app.patch('/asignaciones/:id', exigirAdmin, (req, res) => reenviarA(EXPRESS_API_URL, req, res));
-app.delete('/asignaciones/:id', exigirAdmin, (req, res) => reenviarA(EXPRESS_API_URL, req, res));
+app.patch(['/asignaciones/:id/temporizador', '/asignaciones/:id/iniciar-temporizador', '/asignaciones/:id/detener-temporizador'], exigirRoles('TRABAJADOR', 'ADMIN'), async (req, res) => {
+    if (await autorizarAsignacion(req, res, ['TRABAJADOR']) === null) {
+        return;
+    }
+    return reenviarA(EXPRESS_API_URL, req, res);
+});
 
+app.patch('/asignaciones/:id', exigirRoles('CLIENTE', 'ADMIN'), async (req, res) => {
+    if (await autorizarAsignacion(req, res, ['CLIENTE']) === null) {
+        return;
+    }
+    return reenviarA(EXPRESS_API_URL, req, res);
+});
+
+app.delete('/asignaciones/:id', exigirRoles('CLIENTE', 'ADMIN'), async (req, res) => {
+    if (await autorizarAsignacion(req, res, ['CLIENTE']) === null) {
+        return;
+    }
+    return reenviarA(EXPRESS_API_URL, req, res);
+});
+
+// =========================================================================
+// REGISTROS DE TIEMPO (GATEWAY -> EXPRESS)
+// =========================================================================
 app.get('/registros-tiempo', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), async (req, res) => {
     if (req.usuario.rol === 'ADMIN') {
         return reenviarA(EXPRESS_API_URL, req, res);
@@ -890,9 +1020,20 @@ app.get('/registros-tiempo', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), asyn
         if (fallo) {
             return res.status(fallo.status).json(fallo.data);
         }
+        let registros = resultados.flatMap(resultado => resultado.data.data);
+        if (req.query.asignacion_id !== undefined) {
+            registros = registros.filter(r => Number(r.asignacion_id) === Number(req.query.asignacion_id));
+        }
+        if (req.query.estado !== undefined) {
+            const estadoFiltro = String(req.query.estado).toUpperCase();
+            registros = registros.filter(r => String(r.estado).toUpperCase() === estadoFiltro);
+        }
+        if (req.query.factura_id !== undefined) {
+            registros = registros.filter(r => Number(r.factura_id) === Number(req.query.factura_id));
+        }
         return res.json({
             status: 'success',
-            data: resultados.flatMap(resultado => resultado.data.data)
+            data: registros
         });
     } catch (error) {
         console.error('Error consultando registros de tiempo:', error.message);
@@ -900,10 +1041,38 @@ app.get('/registros-tiempo', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), asyn
     }
 });
 
-app.patch('/registros-tiempo/:id/aprobar', exigirAdmin, (req, res) => reenviarA(EXPRESS_API_URL, req, res));
-app.delete('/registros-tiempo/:id', exigirAdmin, (req, res) => reenviarA(EXPRESS_API_URL, req, res));
-app.use('/facturas/:id/estado', exigirAdmin, (req, res) => reenviarA(EXPRESS_API_URL, req, res));
-app.use('/facturas/:id', exigirAdmin, (req, res) => reenviarA(EXPRESS_API_URL, req, res));
+app.post('/registros-tiempo', exigirRoles('TRABAJADOR', 'ADMIN'), async (req, res) => {
+    const asignacionId = Number(req.body?.asignacion_id);
+    if (!Number.isSafeInteger(asignacionId) || asignacionId <= 0) {
+        return res.status(400).json({ status: 'error', message: 'El campo asignacion_id es obligatorio y debe ser numérico.' });
+    }
+    if (await autorizarAsignacionPorId(req, res, asignacionId, ['TRABAJADOR']) === null) {
+        return;
+    }
+    return reenviarA(EXPRESS_API_URL, req, res);
+});
+
+app.get('/registros-tiempo/:id', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), async (req, res) => {
+    if (await autorizarRegistroTiempo(req, res, ['TRABAJADOR', 'CLIENTE']) === null) {
+        return;
+    }
+    return reenviarA(EXPRESS_API_URL, req, res);
+});
+
+app.patch(['/registros-tiempo/:id/aprobar', '/registros-tiempo/:id/estado', '/registros-tiempo/:id'], exigirRoles('CLIENTE', 'ADMIN'), async (req, res) => {
+    if (await autorizarRegistroTiempo(req, res, ['CLIENTE']) === null) {
+        return;
+    }
+    return reenviarA(EXPRESS_API_URL, req, res);
+});
+
+app.delete('/registros-tiempo/:id', exigirRoles('TRABAJADOR', 'ADMIN'), async (req, res) => {
+    if (await autorizarRegistroTiempo(req, res, ['TRABAJADOR']) === null) {
+        return;
+    }
+    return reenviarA(EXPRESS_API_URL, req, res);
+});
+
 app.use('/asignaciones', exigirAdmin, (req, res) => reenviarA(EXPRESS_API_URL, req, res));
 app.use('/registros-tiempo', exigirAdmin, (req, res) => reenviarA(EXPRESS_API_URL, req, res));
 

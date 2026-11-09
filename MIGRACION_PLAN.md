@@ -40,14 +40,14 @@ Antes de importar hacen falta decisiones para cada cuenta (rol, perfil y restabl
 
 1. No escribir en la base original. Antes del corte, tomar y verificar un respaldo reciente y restaurar el respaldo actual en una instancia o base aislada para probar el proceso.
 2. Obtener las decisiones de mapeo pendientes. No asignar roles, datos de perfil, categoria, horas ni estados de pago por inferencia.
-3. Crear una base de destino nueva con el esquema que actualmente requieren `api's/Python/app/models.py`, Express y PHP. Preparar un DDL versionado sin `DROP DATABASE`; no reutilizar sin cambios los scripts heredados.
+3. Crear una base de destino nueva con el esquema que actualmente requieren `api's/Python/app/models.py`, Express (`api's/Express/index.js`) y PHP (`api's/api_usuario`). Preparar un DDL versionado sin `DROP DATABASE`; no reutilizar sin cambios los scripts heredados.
 4. Copiar desde el respaldo al destino con transformaciones explicitamente aprobadas. Mantener la base original intacta y conservar una copia de las filas heredadas que no se puedan mapear.
-5. Validar conteos, claves foraneas, unicidad, totales de horas y asignaciones factura-proyecto; ejecutar pruebas de integracion en el destino. No marcar facturas como pagadas sin evidencia de pago.
+5. Validar conteos, claves foraneas, unicidad, totales de horas y asignaciones factura-proyecto; ejecutar las suites de pruebas de integracion de PHP (`api's/api_usuario/tests/test_usuarios.php`), Python (`api's/Python/tests/test_api.py`) y Express (`api's/Express/tests/test_express.js`) en el destino. No marcar facturas como pagadas sin evidencia de pago.
 6. Cambiar la configuracion de los servicios al destino solo despues de aprobar esas verificaciones. Conservar la base original y el respaldo para poder volver a la configuracion anterior.
 
-## Scripts heredados que no se deben ejecutar
+## Scripts de esquema y limpieza de scripts obsoletos
 
-- `Backend/schemas.sql` empieza con `DROP DATABASE IF EXISTS plataforma_freelance`.
-- `api's/Python/migracion_bd.sql` inserta perfiles de cliente con datos de relleno, convierte estados desconocidos a `EN_CURSO`, usa categorias y columnas antiguas, y no coincide con el esquema actual de postulaciones ni de registros de tiempo.
+- `Backend/schemas.sql` empieza con `DROP DATABASE IF EXISTS plataforma_freelance`, por lo que solo debe usarse al inicializar una base de datos limpia desde cero.
+- El antiguo script `api's/Python/migracion_bd.sql` (que usaba estados, columnas y categorias obsoletas como `COMPLETADO` y `usuario_id`) fue eliminado del repositorio para evitar ejecuciones accidentales.
 
-Ninguno de esos scripts se ejecuto. Los health checks locales de PHP, Python, Express y Gateway verifican la base de demostracion y responden saludablemente. La base original sigue pendiente de las decisiones de mapeo indicadas arriba; si se vuelve a configurar como destino de los servicios, sus health checks solicitaran migracion.
+Los health checks locales de PHP, Python, Express y Gateway verifican el esquema actual (`usuarios`, `clientes`, `trabajadores`, `proyectos`, `postulaciones`, `asignaciones`, `registros_tiempo`, `facturas`) sobre la base de demostracion y responden saludablemente.

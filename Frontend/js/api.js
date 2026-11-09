@@ -63,7 +63,7 @@ class ApiClient {
       }
 
       if (!response.ok) {
-        const errorMsg = (data && data.message) || (data && data.detail) || `Error HTTP ${response.status}`;
+        const errorMsg = (data && data.message) || (data && data.error) || (data && data.detail) || `Error HTTP ${response.status}`;
         const error = new Error(errorMsg);
         error.status = response.status;
         error.data = data;
@@ -187,7 +187,7 @@ class ApiClient {
     });
   }
 
-  /* ================= ASIGNACIONES (Node.js Express) ================= */
+  /* ================= ASIGNACIONES Y TEMPORIZADOR (Node.js Express) ================= */
   async getAsignaciones() {
     const res = await this.request('/asignaciones');
     return res && res.data ? res.data : [];
@@ -197,6 +197,22 @@ class ApiClient {
     return this.request('/asignaciones', {
       method: 'POST',
       body: data
+    });
+  }
+
+  async obtenerValorAsignacion(asignacionId) {
+    return this.request(`/asignaciones/${Number(asignacionId)}/valor`);
+  }
+
+  async iniciarTemporizador(asignacionId) {
+    return this.request(`/asignaciones/${Number(asignacionId)}/temporizador`, {
+      method: 'POST'
+    });
+  }
+
+  async detenerTemporizador(asignacionId) {
+    return this.request(`/asignaciones/${Number(asignacionId)}/temporizador`, {
+      method: 'DELETE'
     });
   }
 
@@ -211,7 +227,7 @@ class ApiClient {
       throw new Error('Selecciona una asignación válida para registrar las horas.');
     }
 
-    return this.request(`/asignaciones/${Number(data.asignacion_id)}/horas-manuales`, {
+    return this.request(`/asignaciones/${Number(data.asignacion_id)}/registros-tiempo`, {
       method: 'POST',
       body: {
         horas: data.horas,
@@ -221,10 +237,32 @@ class ApiClient {
     });
   }
 
+  async aprobarRegistroTiempo(id, tarifaAplicada = undefined) {
+    const body = { estado: 'APROBADO' };
+    if (tarifaAplicada !== undefined && tarifaAplicada !== null && !isNaN(Number(tarifaAplicada)) && Number(tarifaAplicada) > 0) {
+      body.tarifa_aplicada = Number(tarifaAplicada);
+    }
+    return this.request(`/registros-tiempo/${Number(id)}`, {
+      method: 'PATCH',
+      body
+    });
+  }
+
+  async eliminarRegistroTiempo(id) {
+    return this.request(`/registros-tiempo/${Number(id)}`, {
+      method: 'DELETE'
+    });
+  }
+
   /* ================= FACTURAS (Node.js Express) ================= */
   async getFacturas() {
     const res = await this.request('/facturas');
     return res && res.data ? res.data : [];
+  }
+
+  async getFactura(id) {
+    const res = await this.request(`/facturas/${Number(id)}`);
+    return res && res.data ? res.data : res;
   }
 
   async crearFactura(data) {
@@ -232,6 +270,17 @@ class ApiClient {
       method: 'POST',
       body: data
     });
+  }
+
+  async actualizarEstadoFactura(id, estadoFactura) {
+    return this.request(`/facturas/${Number(id)}`, {
+      method: 'PATCH',
+      body: { estado_factura: estadoFactura }
+    });
+  }
+
+  async aprobarFactura(id) {
+    return this.actualizarEstadoFactura(id, 'APROBADA');
   }
 
 }

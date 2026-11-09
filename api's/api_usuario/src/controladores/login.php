@@ -47,7 +47,7 @@ class LoginController {
         }
 
         $hashGuardado = (string) $usuario['password_hash'];
-        $passwordValido = password_verify($password, $hashGuardado) || hash_equals($hashGuardado, $password);
+        $passwordValido = password_verify($password, $hashGuardado);
 
         if (!$passwordValido) {
             http_response_code(401);

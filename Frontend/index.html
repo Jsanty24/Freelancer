@@ -14,13 +14,16 @@
   <!-- Material Symbols Outlined -->
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 
-  <!-- Configuración de Tailwind CSS con Modo Oscuro -->
-  <script>
-    tailwind = {
-      darkMode: 'class'
-    };
-  </script>
+  <!-- Estilos Utilitarios Tailwind Locales + CDN con Modo Oscuro -->
+  <link rel="stylesheet" href="./css/tailwind-local.css"/>
   <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <script>
+    if (typeof tailwind !== 'undefined') {
+      tailwind.config = {
+        darkMode: 'class'
+      };
+    }
+  </script>
 
   <!-- Estilos Globales Personalizados -->
   <link rel="stylesheet" href="./css/app.css"/>

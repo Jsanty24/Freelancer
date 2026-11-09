@@ -57,6 +57,7 @@ app.get('/health', async (req, res) => {
             console.error('GET /health: el esquema necesita migración. Columnas faltantes:', columnasFaltantes);
             return res.status(503).json({
                 status: 'error',
+                message: 'El esquema de la base de datos requiere una migración',
                 service: 'API Tiempo y Facturacion (Express)',
                 database: 'schema_migration_required'
             });
@@ -66,6 +67,7 @@ app.get('/health', async (req, res) => {
         console.error('GET /health: no se pudo consultar la base de datos:', error.message);
         res.status(503).json({
             status: 'error',
+            message: 'La base de datos no está disponible',
             service: 'API Tiempo y Facturacion (Express)',
             database: 'unavailable'
         });
@@ -91,22 +93,22 @@ function manejarErrorTriggerOBD(res, error, contexto) {
     if (error && error.sqlState === '45000') {
         return res.status(409).json({
             status: 'error',
-            error: error.sqlMessage || error.message
+            message: error.sqlMessage || error.message
         });
     }
     if (error && error.code === 'ER_DUP_ENTRY') {
         return res.status(409).json({
             status: 'error',
-            error: 'El trabajador ya está asignado a este proyecto'
+            message: 'El trabajador ya está asignado a este proyecto'
         });
     }
     if (error && error.code === 'ER_NO_REFERENCED_ROW_2') {
         return res.status(404).json({
             status: 'error',
-            error: 'El recurso referenciado (trabajador, cliente, proyecto o asignación) no existe'
+            message: 'El recurso referenciado (trabajador, cliente, proyecto o asignación) no existe'
         });
     }
-    return res.status(500).json({ status: 'error', error: 'Error en el servidor' });
+    return res.status(500).json({ status: 'error', message: 'Error en el servidor' });
 }
 
 // =========================================================================
@@ -143,7 +145,7 @@ app.get('/asignaciones/:id', async (req, res) => {
             [id]
         );
         if (filas.length === 0) {
-            return res.status(404).json({ status: 'error', error: 'Asignación no encontrada' });
+            return res.status(404).json({ status: 'error', message: 'Asignación no encontrada' });
         }
         res.json({ status: 'success', data: filas[0] });
     } catch (error) {
@@ -163,14 +165,14 @@ app.post('/asignaciones', async (req, res) => {
     ) {
         return res.status(400).json({
             status: 'error',
-            error: "Los campos 'trabajador_id', 'proyecto_id', 'rol_en_proyecto' y 'tarifa_por_hora' son obligatorios"
+            message: "Los campos 'trabajador_id', 'proyecto_id', 'rol_en_proyecto' y 'tarifa_por_hora' son obligatorios"
         });
     }
 
     if (Number(tarifa_por_hora) <= 0) {
         return res.status(400).json({
             status: 'error',
-            error: "El campo 'tarifa_por_hora' debe ser mayor que cero"
+            message: "El campo 'tarifa_por_hora' debe ser mayor que cero"
         });
     }
 
@@ -198,7 +200,7 @@ app.patch('/asignaciones/:id', async (req, res) => {
 
     if (rol_en_proyecto !== undefined) {
         if (!String(rol_en_proyecto).trim()) {
-            return res.status(400).json({ status: 'error', error: 'rol_en_proyecto no puede estar vacío' });
+            return res.status(400).json({ status: 'error', message: 'rol_en_proyecto no puede estar vacío' });
         }
         sets.push('rol_en_proyecto = ?');
         valores.push(String(rol_en_proyecto).trim());
@@ -206,14 +208,14 @@ app.patch('/asignaciones/:id', async (req, res) => {
 
     if (tarifa_por_hora !== undefined) {
         if (isNaN(Number(tarifa_por_hora)) || Number(tarifa_por_hora) <= 0) {
-            return res.status(400).json({ status: 'error', error: 'tarifa_por_hora debe ser mayor que cero' });
+            return res.status(400).json({ status: 'error', message: 'tarifa_por_hora debe ser mayor que cero' });
         }
         sets.push('tarifa_por_hora = ?');
         valores.push(Number(tarifa_por_hora));
     }
 
     if (sets.length === 0) {
-        return res.status(400).json({ status: 'error', error: 'Envía al menos rol_en_proyecto o tarifa_por_hora' });
+        return res.status(400).json({ status: 'error', message: 'Envía al menos rol_en_proyecto o tarifa_por_hora' });
     }
 
     try {
@@ -223,7 +225,7 @@ app.patch('/asignaciones/:id', async (req, res) => {
             valores
         );
         if (resultado.affectedRows === 0) {
-            return res.status(404).json({ status: 'error', error: 'Asignación no encontrada' });
+            return res.status(404).json({ status: 'error', message: 'Asignación no encontrada' });
         }
         res.json({ status: 'success', message: 'Asignación actualizada correctamente' });
     } catch (error) {
@@ -236,7 +238,7 @@ app.delete('/asignaciones/:id', async (req, res) => {
     try {
         const [resultado] = await db.query('DELETE FROM asignaciones WHERE id = ?', [id]);
         if (resultado.affectedRows === 0) {
-            return res.status(404).json({ status: 'error', error: 'Asignación no encontrada' });
+            return res.status(404).json({ status: 'error', message: 'Asignación no encontrada' });
         }
         res.json({ status: 'success', message: 'Asignación eliminada correctamente' });
     } catch (error) {
@@ -249,7 +251,7 @@ app.delete('/asignaciones/:id', async (req, res) => {
 // =========================================================================
 
 // Iniciar temporizador evitando solapamiento por trabajador_id
-app.patch('/asignaciones/:id/iniciar-temporizador', async (req, res) => {
+async function iniciarTemporizadorHandler(req, res) {
     const { id } = req.params;
 
     try {
@@ -259,13 +261,14 @@ app.patch('/asignaciones/:id/iniciar-temporizador', async (req, res) => {
         );
 
         if (asignaciones.length === 0) {
-            return res.status(404).json({ message: 'Asignación no encontrada' });
+            return res.status(404).json({ status: 'error', message: 'Asignación no encontrada' });
         }
 
         const asignacion = asignaciones[0];
         if (asignacion.temporizador_inicio !== null) {
-            return res.status(400).json({
-                error: 'El temporizador de esta asignación ya se encuentra activo.'
+            return res.status(409).json({
+                status: 'error',
+                message: 'El temporizador de esta asignación ya se encuentra activo.'
             });
         }
 
@@ -275,8 +278,9 @@ app.patch('/asignaciones/:id/iniciar-temporizador', async (req, res) => {
         );
 
         if (activos.length > 0) {
-            return res.status(400).json({
-                error: 'Solapamiento detectado: El trabajador ya tiene un temporizador activo.'
+            return res.status(409).json({
+                status: 'error',
+                message: 'Solapamiento detectado: El trabajador ya tiene un temporizador activo.'
             });
         }
 
@@ -285,14 +289,14 @@ app.patch('/asignaciones/:id/iniciar-temporizador', async (req, res) => {
             [id]
         );
 
-        res.json({ message: 'Temporizador iniciado correctamente' });
+        res.json({ status: 'success', message: 'Temporizador iniciado correctamente' });
     } catch (error) {
-        manejarErrorTriggerOBD(res, error, 'PATCH /asignaciones/:id/iniciar-temporizador');
+        manejarErrorTriggerOBD(res, error, 'POST /asignaciones/:id/temporizador');
     }
-});
+}
 
 // Detener temporizador y crear el registro en registros_tiempo
-app.patch('/asignaciones/:id/detener-temporizador', async (req, res) => {
+async function detenerTemporizadorHandler(req, res) {
     const { id } = req.params;
 
     const conn = await db.getConnection();
@@ -306,13 +310,16 @@ app.patch('/asignaciones/:id/detener-temporizador', async (req, res) => {
 
         if (asignaciones.length === 0) {
             await conn.rollback();
-            return res.status(404).json({ message: 'Asignación no encontrada' });
+            return res.status(404).json({ status: 'error', message: 'Asignación no encontrada' });
         }
 
         const asignacion = asignaciones[0];
         if (asignacion.temporizador_inicio === null) {
             await conn.rollback();
-            return res.status(400).json({ error: 'No hay un temporizador activo en esta asignación' });
+            return res.status(400).json({
+                status: 'error',
+                message: 'No hay un temporizador activo en esta asignación'
+            });
         }
 
         const segundos = Number(asignacion.segundos_transcurridos) || 1;
@@ -332,30 +339,59 @@ app.patch('/asignaciones/:id/detener-temporizador', async (req, res) => {
         await conn.commit();
 
         res.json({
+            status: 'success',
             message: 'Temporizador detenido correctamente',
             registroTiempoId: insertRes.insertId,
             horasRegistradas: horasCalculadas
         });
     } catch (error) {
         await conn.rollback();
-        manejarErrorTriggerOBD(res, error, 'PATCH /asignaciones/:id/detener-temporizador');
+        manejarErrorTriggerOBD(res, error, 'DELETE /asignaciones/:id/temporizador');
     } finally {
         conn.release();
     }
+}
+
+// Rutas RESTful sustantivas para temporizador + alias compatibles
+app.post('/asignaciones/:id/temporizador', iniciarTemporizadorHandler);
+app.delete('/asignaciones/:id/temporizador', detenerTemporizadorHandler);
+app.patch('/asignaciones/:id/temporizador', (req, res) => {
+    const accion = String(req.body?.accion || req.body?.estado || '').trim().toUpperCase();
+    if (req.body?.activo === false || accion === 'DETENER' || accion === 'DETENIDO') {
+        return detenerTemporizadorHandler(req, res);
+    }
+    return iniciarTemporizadorHandler(req, res);
 });
+app.patch('/asignaciones/:id/iniciar-temporizador', iniciarTemporizadorHandler);
+app.post('/asignaciones/:id/iniciar-temporizador', iniciarTemporizadorHandler);
+app.patch('/asignaciones/:id/detener-temporizador', detenerTemporizadorHandler);
+app.post('/asignaciones/:id/detener-temporizador', detenerTemporizadorHandler);
 
 // Registrar horas manuales en registros_tiempo
-app.post('/asignaciones/:id/horas-manuales', async (req, res) => {
-    const { id } = req.params;
-    const { horas, inicio, fin } = req.body;
+async function registrarHorasManualesHandler(req, res) {
+    const id = req.params.id ?? req.body?.asignacion_id;
+    const { horas, inicio, fin } = req.body || {};
+
+    if (id === undefined || id === null || isNaN(Number(id))) {
+        return res.status(400).json({
+            status: 'error',
+            message: 'El campo asignacion_id es obligatorio y debe ser numérico'
+        });
+    }
 
     if (horas === undefined || horas === null || isNaN(Number(horas))) {
-        return res.status(400).json({ error: 'El campo horas es obligatorio y debe ser numerico' });
+        return res.status(400).json({
+            status: 'error',
+            message: 'El campo horas es obligatorio y debe ser numerico'
+        });
     }
 
     const numHoras = Number(horas);
     if (numHoras <= 0 || numHoras > 999.99) {
-        return res.status(400).json({ error: 'Las horas deben ser mayores que cero y menores a 1000' });
+        return res.status(400).json({
+            status: 'error',
+            message: 'Las horas deben ser mayores que cero y menores a 1000'
+        });
     }
 
     try {
@@ -364,7 +400,7 @@ app.post('/asignaciones/:id/horas-manuales', async (req, res) => {
             [id]
         );
         if (asignaciones.length === 0) {
-            return res.status(404).json({ error: 'Asignación no encontrada' });
+            return res.status(404).json({ status: 'error', message: 'Asignación no encontrada' });
         }
 
         let insertRes;
@@ -384,17 +420,23 @@ app.post('/asignaciones/:id/horas-manuales', async (req, res) => {
         }
 
         res.status(201).json({
-            mensaje: 'Horas registradas correctamente',
+            status: 'success',
+            message: 'Horas registradas correctamente',
             registroTiempoId: insertRes.insertId,
             horas: numHoras
         });
     } catch (error) {
-        manejarErrorTriggerOBD(res, error, 'POST /asignaciones/:id/horas-manuales');
+        manejarErrorTriggerOBD(res, error, 'POST /asignaciones/:id/registros-tiempo');
     }
-});
+}
+
+app.post('/asignaciones/:id/registros-tiempo', registrarHorasManualesHandler);
+app.post('/asignaciones/:id/horas', registrarHorasManualesHandler);
+app.post('/asignaciones/:id/horas-manuales', registrarHorasManualesHandler);
+app.post('/registros-tiempo', registrarHorasManualesHandler);
 
 // Calcular el valor acumulado de la asignación a partir de registros_tiempo
-app.get('/asignaciones/:id/calcular-valor', async (req, res) => {
+async function obtenerValorAsignacionHandler(req, res) {
     const { id } = req.params;
 
     try {
@@ -404,7 +446,7 @@ app.get('/asignaciones/:id/calcular-valor', async (req, res) => {
         );
 
         if (asignaciones.length === 0) {
-            return res.status(404).json({ error: 'Asignación no encontrada' });
+            return res.status(404).json({ status: 'error', message: 'Asignación no encontrada' });
         }
 
         const asignacion = asignaciones[0];
@@ -424,6 +466,7 @@ app.get('/asignaciones/:id/calcular-valor', async (req, res) => {
 
         const fila = resumen[0];
         res.json({
+            status: 'success',
             asignacion: Number(id),
             horasAcumuladas: Number(fila.horas_totales),
             horasPendientes: Number(fila.horas_pendientes),
@@ -433,9 +476,13 @@ app.get('/asignaciones/:id/calcular-valor', async (req, res) => {
             valorTotal: Number(Number(fila.valor_total).toFixed(2))
         });
     } catch (error) {
-        manejarErrorTriggerOBD(res, error, 'GET /asignaciones/:id/calcular-valor');
+        manejarErrorTriggerOBD(res, error, 'GET /asignaciones/:id/valor');
     }
-});
+}
+
+app.get('/asignaciones/:id/valor', obtenerValorAsignacionHandler);
+app.get('/asignaciones/:id/resumen', obtenerValorAsignacionHandler);
+app.get('/asignaciones/:id/calcular-valor', obtenerValorAsignacionHandler);
 
 // =========================================================================
 // REGISTROS DE TIEMPO (APROBACIÓN, CONSULTA Y BORRADO)
@@ -480,10 +527,34 @@ app.get('/registros-tiempo', async (req, res) => {
     }
 });
 
-// Aprobar o actualizar estado de un registro de tiempo (cumpliendo chk_tarifa_obligatoria)
-app.patch('/registros-tiempo/:id/aprobar', async (req, res) => {
+app.get('/registros-tiempo/:id', async (req, res) => {
     const { id } = req.params;
-    const { tarifa_aplicada } = req.body || {};
+    try {
+        const [registros] = await db.query(
+            'SELECT id, asignacion_id, inicio, fin, horas, tarifa_aplicada, origen, estado, factura_id FROM registros_tiempo WHERE id = ?',
+            [id]
+        );
+        if (registros.length === 0) {
+            return res.status(404).json({ status: 'error', message: 'Registro de tiempo no encontrado' });
+        }
+        res.json({ status: 'success', data: registros[0] });
+    } catch (error) {
+        manejarErrorTriggerOBD(res, error, 'GET /registros-tiempo/:id');
+    }
+});
+
+// Aprobar o actualizar estado de un registro de tiempo (cumpliendo chk_tarifa_obligatoria)
+async function aprobarRegistroTiempoHandler(req, res) {
+    const { id } = req.params;
+    const { tarifa_aplicada, estado } = req.body || {};
+    const estadoSolicitado = estado !== undefined ? String(estado).trim().toUpperCase() : 'APROBADO';
+
+    if (!ESTADOS_TIEMPO_VALIDOS.includes(estadoSolicitado)) {
+        return res.status(400).json({
+            status: 'error',
+            message: `estado debe ser uno de: ${ESTADOS_TIEMPO_VALIDOS.join(', ')}`
+        });
+    }
 
     try {
         const [filas] = await db.query(
@@ -495,7 +566,7 @@ app.patch('/registros-tiempo/:id/aprobar', async (req, res) => {
         );
 
         if (filas.length === 0) {
-            return res.status(404).json({ error: 'Registro de tiempo no encontrado' });
+            return res.status(404).json({ status: 'error', message: 'Registro de tiempo no encontrado' });
         }
 
         const tarifaFinal = tarifa_aplicada !== undefined && tarifa_aplicada !== null
@@ -503,33 +574,38 @@ app.patch('/registros-tiempo/:id/aprobar', async (req, res) => {
             : Number(filas[0].tarifa_por_hora);
 
         if (isNaN(tarifaFinal) || tarifaFinal <= 0) {
-            return res.status(400).json({ error: 'tarifa_aplicada debe ser mayor que cero' });
+            return res.status(400).json({ status: 'error', message: 'tarifa_aplicada debe ser mayor que cero' });
         }
 
         await db.query(
-            "UPDATE registros_tiempo SET estado = 'APROBADO', tarifa_aplicada = ? WHERE id = ?",
-            [tarifaFinal, id]
+            'UPDATE registros_tiempo SET estado = ?, tarifa_aplicada = ? WHERE id = ?',
+            [estadoSolicitado, tarifaFinal, id]
         );
 
         res.json({
-            mensaje: 'Registro de tiempo aprobado correctamente',
+            status: 'success',
+            message: 'Registro de tiempo aprobado correctamente',
             id: Number(id),
-            estado: 'APROBADO',
+            estado: estadoSolicitado,
             tarifa_aplicada: tarifaFinal
         });
     } catch (error) {
-        manejarErrorTriggerOBD(res, error, 'PATCH /registros-tiempo/:id/aprobar');
+        manejarErrorTriggerOBD(res, error, 'PATCH /registros-tiempo/:id');
     }
-});
+}
+
+app.patch('/registros-tiempo/:id', aprobarRegistroTiempoHandler);
+app.patch('/registros-tiempo/:id/estado', aprobarRegistroTiempoHandler);
+app.patch('/registros-tiempo/:id/aprobar', aprobarRegistroTiempoHandler);
 
 app.delete('/registros-tiempo/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const [resultado] = await db.query('DELETE FROM registros_tiempo WHERE id = ?', [id]);
         if (resultado.affectedRows === 0) {
-            return res.status(404).json({ error: 'Registro de tiempo no encontrado' });
+            return res.status(404).json({ status: 'error', message: 'Registro de tiempo no encontrado' });
         }
-        res.json({ mensaje: 'Registro de tiempo eliminado correctamente' });
+        res.json({ status: 'success', message: 'Registro de tiempo eliminado correctamente' });
     } catch (error) {
         manejarErrorTriggerOBD(res, error, 'DELETE /registros-tiempo/:id');
     }
@@ -573,7 +649,7 @@ app.get('/facturas/:id', async (req, res) => {
             [id]
         );
         if (facturas.length === 0) {
-            return res.status(404).json({ error: 'Factura no encontrada' });
+            return res.status(404).json({ status: 'error', message: 'Factura no encontrada' });
         }
         const [registros] = await db.query(
             'SELECT id, asignacion_id, inicio, fin, horas, tarifa_aplicada, origen, estado FROM registros_tiempo WHERE factura_id = ?',
@@ -599,7 +675,8 @@ app.post('/facturas', async (req, res) => {
 
     if (trabajadorId === undefined || trabajadorId === null || isNaN(Number(trabajadorId))) {
         return res.status(400).json({
-            error: 'El campo trabajador_id (o idUsuario) es obligatorio y debe ser numerico'
+            status: 'error',
+            message: 'El campo trabajador_id (o idUsuario) es obligatorio y debe ser numerico'
         });
     }
 
@@ -637,14 +714,15 @@ app.post('/facturas', async (req, res) => {
 
         if (registros.length === 0) {
             await conn.rollback();
-            return res.status(404).json({ error: 'No hay horas aprobadas para facturar' });
+            return res.status(404).json({ status: 'error', message: 'No hay horas aprobadas para facturar' });
         }
 
         const clientesDistintos = [...new Set(registros.map(r => r.cliente_id))];
         if (clientesDistintos.length > 1) {
             await conn.rollback();
             return res.status(400).json({
-                error: 'Existen horas aprobadas de distintos clientes. Especifica cliente_id en el cuerpo de la petición.'
+                status: 'error',
+                message: 'Existen horas aprobadas de distintos clientes. Especifica cliente_id en el cuerpo de la petición.'
             });
         }
 
@@ -680,7 +758,8 @@ app.post('/facturas', async (req, res) => {
         await conn.commit();
 
         res.status(201).json({
-            mensaje: 'Factura generada y registros congelados con exito',
+            status: 'success',
+            message: 'Factura generada y registros congelados con exito',
             idFactura: facturaId,
             cliente_id: clienteId,
             trabajador_id: Number(trabajadorId),
@@ -698,13 +777,14 @@ app.post('/facturas', async (req, res) => {
 
 // Cambiar el estado de la factura (PENDIENTE -> APROBADA | RECHAZADA | PAGADA)
 // Si pasa a RECHAZADA, el trigger trg_factura_rechazada_libera libera los registros_tiempo a APROBADO
-app.patch('/facturas/:id/estado', async (req, res) => {
+async function actualizarEstadoFacturaHandler(req, res) {
     const { id } = req.params;
-    const estadoNuevo = (req.body.estado_factura ?? req.body.estado ?? '').toString().trim().toUpperCase();
+    const estadoNuevo = (req.body?.estado_factura ?? req.body?.estado ?? '').toString().trim().toUpperCase();
 
     if (!ESTADOS_FACTURA_VALIDOS.includes(estadoNuevo)) {
         return res.status(400).json({
-            error: `estado_factura debe ser uno de: ${ESTADOS_FACTURA_VALIDOS.join(', ')}`
+            status: 'error',
+            message: `estado_factura debe ser uno de: ${ESTADOS_FACTURA_VALIDOS.join(', ')}`
         });
     }
 
@@ -715,30 +795,41 @@ app.patch('/facturas/:id/estado', async (req, res) => {
         );
 
         if (resultado.affectedRows === 0) {
-            return res.status(404).json({ error: 'Factura no encontrada' });
+            return res.status(404).json({ status: 'error', message: 'Factura no encontrada' });
         }
 
         res.json({
-            mensaje: `Estado de la factura actualizado a ${estadoNuevo}`,
+            status: 'success',
+            message: `Estado de la factura actualizado a ${estadoNuevo}`,
             idFactura: Number(id),
             estado_factura: estadoNuevo
         });
     } catch (error) {
-        manejarErrorTriggerOBD(res, error, 'PATCH /facturas/:id/estado');
+        manejarErrorTriggerOBD(res, error, 'PATCH /facturas/:id');
     }
-});
+}
+
+app.patch('/facturas/:id', actualizarEstadoFacturaHandler);
+app.patch('/facturas/:id/estado', actualizarEstadoFacturaHandler);
 
 app.delete('/facturas/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const [resultado] = await db.query('DELETE FROM facturas WHERE id = ?', [id]);
         if (resultado.affectedRows === 0) {
-            return res.status(404).json({ error: 'Factura no encontrada' });
+            return res.status(404).json({ status: 'error', message: 'Factura no encontrada' });
         }
-        res.json({ mensaje: 'Factura eliminada correctamente' });
+        res.json({ status: 'success', message: 'Factura eliminada correctamente' });
     } catch (error) {
         manejarErrorTriggerOBD(res, error, 'DELETE /facturas/:id');
     }
+});
+
+app.use((req, res) => {
+    res.status(404).json({
+        status: 'error',
+        message: `Ruta '${req.originalUrl}' no encontrada`
+    });
 });
 
 const PORT = process.env.PORT || 3000;
@@ -749,4 +840,5 @@ if (require.main === module) {
     });
 }
 
+app.db = db;
 module.exports = app;

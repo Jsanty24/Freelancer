@@ -1,0 +1,384 @@
+{
+  "info": {
+    "_postman_id": "8e3b9f50-4a12-4d89-9c10-2026freelance",
+    "name": "Plataforma Freelancer — Colección Completa (Gateway, PHP, Python, Express)",
+    "description": "Colección de pruebas RESTful para las 4 APIs de la Plataforma Freelancer:\n- API 1: Usuarios, Clientes, Trabajadores y Login (PHP :8000)\n- API 2: Proyectos y Postulaciones (Python FastAPI :5000)\n- API 3: Asignaciones, Temporizador, Registros de Tiempo y Facturación (Node.js Express :3000)\n- API 4: API Gateway Central (:4000)\n\nIncluye el flujo completo: Registro/Login -> Crear Proyecto -> Postularse -> Aceptar Postulación (crea asignación) -> Temporizador y Horas -> Aprobar Horas (Cliente) -> Emitir Factura (Trabajador) -> Aprobar/Rechazar/Pagar Factura (Cliente).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "gateway_url", "value": "http://localhost:4000" },
+    { "key": "php_url", "value": "http://127.0.0.1:8000" },
+    { "key": "python_url", "value": "http://127.0.0.1:5000" },
+    { "key": "express_url", "value": "http://127.0.0.1:3000" },
+    { "key": "token_cliente", "value": "" },
+    { "key": "token_trabajador", "value": "" },
+    { "key": "token_admin", "value": "" },
+    { "key": "proyecto_id", "value": "1" },
+    { "key": "postulacion_id", "value": "1" },
+    { "key": "asignacion_id", "value": "1" },
+    { "key": "registro_tiempo_id", "value": "1" },
+    { "key": "factura_id", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "1. Salud y Autenticación (Gateway + API 1 PHP)",
+      "item": [
+        {
+          "name": "GET /health (Estado de los 4 servicios)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/health",
+              "host": ["{{gateway_url}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "POST /auth/registro (Registrar Cliente)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Ana Cliente\",\n  \"email\": \"ana.cliente@ejemplo.com\",\n  \"telefono\": \"3001234567\",\n  \"password\": \"ClienteSegura123!\",\n  \"rol\": \"CLIENTE\",\n  \"razon_social\": \"InnovaTech S.A.S.\",\n  \"direccion_facturacion\": \"Av. Siempre Viva 123\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/auth/registro",
+              "host": ["{{gateway_url}}"],
+              "path": ["auth", "registro"]
+            }
+          }
+        },
+        {
+          "name": "POST /auth/registro (Registrar Trabajador)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Carlos Freelancer\",\n  \"email\": \"carlos.dev@ejemplo.com\",\n  \"telefono\": \"3007654321\",\n  \"password\": \"TrabajadorSeguro123!\",\n  \"rol\": \"TRABAJADOR\",\n  \"especialidad\": \"Full-Stack Node & Python\",\n  \"disponibilidad\": true\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/auth/registro",
+              "host": ["{{gateway_url}}"],
+              "path": ["auth", "registro"]
+            }
+          }
+        },
+        {
+          "name": "POST /auth/login (Iniciar sesión Cliente)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ana.cliente@ejemplo.com\",\n  \"password\": \"ClienteSegura123!\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/auth/login",
+              "host": ["{{gateway_url}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "POST /auth/login (Iniciar sesión Trabajador)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"carlos.dev@ejemplo.com\",\n  \"password\": \"TrabajadorSeguro123!\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/auth/login",
+              "host": ["{{gateway_url}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "GET /auth/me (Perfil autenticado)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_cliente}}" }],
+            "url": {
+              "raw": "{{gateway_url}}/auth/me",
+              "host": ["{{gateway_url}}"],
+              "path": ["auth", "me"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Proyectos y Postulaciones (Gateway + API 2 Python)",
+      "item": [
+        {
+          "name": "POST /proyectos (Crear proyecto - CLIENTE)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_cliente}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre_proyecto\": \"Plataforma E-Commerce Microservicios\",\n  \"descripcion\": \"Desarrollo de API REST y pasarela\",\n  \"fecha_inicio\": \"2026-02-10\",\n  \"tecnologia\": {\n    \"lenguaje_principal\": \"Python / FastAPI\",\n    \"repositorio_url\": \"https://github.com/org/ecommerce\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/proyectos",
+              "host": ["{{gateway_url}}"],
+              "path": ["proyectos"]
+            }
+          }
+        },
+        {
+          "name": "GET /proyectos (Listar proyectos con filtros)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/proyectos?limit=20&offset=0",
+              "host": ["{{gateway_url}}"],
+              "path": ["proyectos"],
+              "query": [
+                { "key": "limit", "value": "20" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /proyectos/:id/progreso (Consultar progreso)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_cliente}}" }],
+            "url": {
+              "raw": "{{gateway_url}}/proyectos/{{proyecto_id}}/progreso",
+              "host": ["{{gateway_url}}"],
+              "path": ["proyectos", "{{proyecto_id}}", "progreso"]
+            }
+          }
+        },
+        {
+          "name": "POST /proyectos/:id/postulaciones (Postularse - TRABAJADOR)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_trabajador}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tarifa_propuesta\": 65.00,\n  \"mensaje\": \"Especialista en arquitectura de microservicios y bases de datos relacionales.\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/proyectos/{{proyecto_id}}/postulaciones",
+              "host": ["{{gateway_url}}"],
+              "path": ["proyectos", "{{proyecto_id}}", "postulaciones"]
+            }
+          }
+        },
+        {
+          "name": "PATCH /postulaciones/:id (Aceptar propuesta y crear asignación - CLIENTE)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_cliente}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"ACEPTADA\",\n  \"rol_en_proyecto\": \"Arquitecto Backend\",\n  \"crear_asignacion\": true\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/postulaciones/{{postulacion_id}}",
+              "host": ["{{gateway_url}}"],
+              "path": ["postulaciones", "{{postulacion_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Asignaciones, Temporizador y Horas (Gateway + API 3 Express)",
+      "item": [
+        {
+          "name": "GET /asignaciones (Listar asignaciones propias)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_trabajador}}" }],
+            "url": {
+              "raw": "{{gateway_url}}/asignaciones",
+              "host": ["{{gateway_url}}"],
+              "path": ["asignaciones"]
+            }
+          }
+        },
+        {
+          "name": "POST /asignaciones/:id/temporizador (Iniciar temporizador - 409 si duplicado)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_trabajador}}" }],
+            "url": {
+              "raw": "{{gateway_url}}/asignaciones/{{asignacion_id}}/temporizador",
+              "host": ["{{gateway_url}}"],
+              "path": ["asignaciones", "{{asignacion_id}}", "temporizador"]
+            }
+          }
+        },
+        {
+          "name": "DELETE /asignaciones/:id/temporizador (Detener temporizador y crear registro)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_trabajador}}" }],
+            "url": {
+              "raw": "{{gateway_url}}/asignaciones/{{asignacion_id}}/temporizador",
+              "host": ["{{gateway_url}}"],
+              "path": ["asignaciones", "{{asignacion_id}}", "temporizador"]
+            }
+          }
+        },
+        {
+          "name": "POST /asignaciones/:id/registros-tiempo (Registrar horas manuales - TRABAJADOR)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_trabajador}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"horas\": 4.5\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/asignaciones/{{asignacion_id}}/registros-tiempo",
+              "host": ["{{gateway_url}}"],
+              "path": ["asignaciones", "{{asignacion_id}}", "registros-tiempo"]
+            }
+          }
+        },
+        {
+          "name": "GET /asignaciones/:id/valor (Consultar horas y valor acumulado)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_cliente}}" }],
+            "url": {
+              "raw": "{{gateway_url}}/asignaciones/{{asignacion_id}}/valor",
+              "host": ["{{gateway_url}}"],
+              "path": ["asignaciones", "{{asignacion_id}}", "valor"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Aprobación de Horas y Facturación (Flujo Cliente - Trabajador)",
+      "item": [
+        {
+          "name": "GET /registros-tiempo (Listar registros de tiempo)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_cliente}}" }],
+            "url": {
+              "raw": "{{gateway_url}}/registros-tiempo",
+              "host": ["{{gateway_url}}"],
+              "path": ["registros-tiempo"]
+            }
+          }
+        },
+        {
+          "name": "PATCH /registros-tiempo/:id (Aprobar horas - CLIENTE)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_cliente}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"APROBADO\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/registros-tiempo/{{registro_tiempo_id}}",
+              "host": ["{{gateway_url}}"],
+              "path": ["registros-tiempo", "{{registro_tiempo_id}}"]
+            }
+          }
+        },
+        {
+          "name": "POST /facturas (Emitir factura y congelar registros - TRABAJADOR)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_trabajador}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/facturas",
+              "host": ["{{gateway_url}}"],
+              "path": ["facturas"]
+            }
+          }
+        },
+        {
+          "name": "GET /facturas/:id (Detalle de factura y registros congelados)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token_cliente}}" }],
+            "url": {
+              "raw": "{{gateway_url}}/facturas/{{factura_id}}",
+              "host": ["{{gateway_url}}"],
+              "path": ["facturas", "{{factura_id}}"]
+            }
+          }
+        },
+        {
+          "name": "PATCH /facturas/:id (Aprobar factura - CLIENTE)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_cliente}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado_factura\": \"APROBADA\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/facturas/{{factura_id}}",
+              "host": ["{{gateway_url}}"],
+              "path": ["facturas", "{{factura_id}}"]
+            }
+          }
+        },
+        {
+          "name": "PATCH /facturas/:id (Marcar factura como PAGADA - CLIENTE)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token_cliente}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado_factura\": \"PAGADA\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/facturas/{{factura_id}}",
+              "host": ["{{gateway_url}}"],
+              "path": ["facturas", "{{factura_id}}"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
