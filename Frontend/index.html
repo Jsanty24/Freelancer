@@ -17,13 +17,7 @@
   <!-- Estilos Utilitarios Tailwind Locales + CDN con Modo Oscuro -->
   <link rel="stylesheet" href="./css/tailwind-local.css"/>
   <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
-  <script>
-    if (typeof tailwind !== 'undefined') {
-      tailwind.config = {
-        darkMode: 'class'
-      };
-    }
-  </script>
+  <script src="./js/config.js?v=20261109_5"></script>
 
   <!-- Estilos Globales Personalizados -->
   <link rel="stylesheet" href="./css/app.css"/>
@@ -39,7 +33,7 @@
         <!-- Botón Menú Hamburguesa Móvil (< 768px) -->
         <button
           id="mobileMenuBtn"
-          onclick="window.App.toggleMenuMovil()"
+          data-csp-click="window.App.toggleMenuMovil()"
           class="md:hidden p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           title="Menú de Navegación">
           <span class="material-symbols-outlined text-[24px]">menu</span>
@@ -55,38 +49,38 @@
         <!-- Enlaces Principales de Navegación Desktop -->
         <nav class="hidden md:flex items-center gap-1 font-ui">
           <button
-            onclick="window.App.cambiarVista('marketplace')"
+            data-csp-click="window.App.cambiarVista('marketplace')"
             data-vista="marketplace"
             class="nav-link nav-link-active px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all">
             <span class="material-symbols-outlined text-[17px]">storefront</span> Marketplace
           </button>
           <button
-            onclick="window.App.cambiarVista('talento')"
+            data-csp-click="window.App.cambiarVista('talento')"
             data-vista="talento"
             class="nav-link nav-link-inactive px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800">
-            <span class="material-symbols-outlined text-[17px]">groups</span> Talento
+            <span class="material-symbols-outlined text-[17px]">engineering</span> Trabajadores
           </button>
           <button
-            onclick="window.App.cambiarVista('workspace')"
+            data-csp-click="window.App.cambiarVista('workspace')"
             data-vista="workspace"
             class="nav-link nav-link-inactive px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800">
             <span class="material-symbols-outlined text-[17px]">terminal</span> Workspace
           </button>
           <button
-            onclick="window.App.cambiarVista('contratos')"
+            data-csp-click="window.App.cambiarVista('contratos')"
             data-vista="contratos"
             class="nav-link nav-link-inactive px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800">
             <span class="material-symbols-outlined text-[17px]">shield</span> Contratos
           </button>
           <button
-            onclick="window.App.cambiarVista('finanzas')"
+            data-csp-click="window.App.cambiarVista('finanzas')"
             data-vista="finanzas"
             class="nav-link nav-link-inactive px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800">
             <span class="material-symbols-outlined text-[17px]">account_balance_wallet</span> Finanzas
           </button>
           <button
             id="navLinkAdmin"
-            onclick="window.App.cambiarVista('admin')"
+            data-csp-click="window.App.cambiarVista('admin')"
             data-vista="admin"
             class="nav-link nav-link-inactive hidden px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40">
             <span class="material-symbols-outlined text-[17px]">security</span> Admin
@@ -99,7 +93,7 @@
         <!-- Toggle Modo Oscuro -->
         <button
           id="darkModeToggleBtn"
-          onclick="window.App.toggleModoOscuro()"
+          data-csp-click="window.App.toggleModoOscuro()"
           class="p-2 rounded-xl text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           title="Cambiar Modo Claro / Oscuro">
           <span id="darkModeIcon" class="material-symbols-outlined text-[19px]">dark_mode</span>
@@ -108,7 +102,7 @@
         <!-- Botón Publicar Proyecto (Solo CLIENTE) -->
         <button
           id="btnPublicarProyectoHeader"
-          onclick="window.App.abrirModalPublicarProyecto()"
+          data-csp-click="window.App.abrirModalPublicarProyecto()"
           class="hidden btn-primary text-xs py-1.5 px-3">
           <span class="material-symbols-outlined text-[16px]">add</span> <span class="hidden sm:inline">Publicar Proyecto</span>
         </button>
@@ -116,9 +110,20 @@
         <!-- Botón Iniciar Sesión / Registrarse -->
         <button
           id="navBtnLogin"
-          onclick="window.App.abrirModalLogin()"
+          data-csp-click="window.App.abrirModalLogin()"
           class="hidden sm:inline-flex btn-secondary text-xs py-1.5 px-2.5">
           <span class="material-symbols-outlined text-[16px]">login</span> Entrar
+        </button>
+
+        <!-- Badge de Seguridad: Token Rotativo en Vivo -->
+        <button
+          id="tokenRotationBadge"
+          data-csp-click="window.App.abrirModalCentroSeguridad()"
+          title="Abrir Centro de Seguridad en Vivo y Rotación de Tokens (Rotación automática cada 30s)"
+          class="hidden items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-[11px] font-mono hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-all">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="tokenRotationText">Token #1 · 30s</span>
+          <span class="material-symbols-outlined text-[14px]">sync_lock</span>
         </button>
 
         <!-- Perfil Usuario Activo -->
@@ -133,7 +138,7 @@
           <!-- Botón Logout rápido -->
           <button
             id="navBtnLogout"
-            onclick="window.App.cerrarSesion()"
+            data-csp-click="window.App.cerrarSesion()"
             class="hidden p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
             title="Cerrar sesión">
             <span class="material-symbols-outlined text-[18px]">logout</span>
@@ -144,15 +149,15 @@
   </header>
 
   <!-- ================= MENÚ MÓVIL (DRAWER RESPONSIVE) ================= -->
-  <div id="mobileDrawerOverlay" class="mobile-drawer-overlay" onclick="window.App.cerrarMenuMovil()">
-    <div class="mobile-drawer p-5 justify-between" onclick="event.stopPropagation()">
+  <div id="mobileDrawerOverlay" class="mobile-drawer-overlay" data-csp-click="window.App.cerrarMenuMovil()">
+    <div class="mobile-drawer p-5 justify-between" data-csp-click="event.stopPropagation()">
       <div>
         <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100 dark:border-slate-800">
           <div class="flex items-center gap-2">
             <img src="./public/logo-principal.svg" alt="" class="w-8 h-8 rounded-lg"/>
             <span class="font-bold text-base text-slate-900 dark:text-white">Menú Freelancer</span>
           </div>
-          <button onclick="window.App.cerrarMenuMovil()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+          <button data-csp-click="window.App.cerrarMenuMovil()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
             <span class="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
@@ -170,22 +175,22 @@
 
         <!-- Enlaces Móviles -->
         <nav class="space-y-1">
-          <button onclick="window.App.cambiarVista('marketplace'); window.App.cerrarMenuMovil();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
+          <button data-csp-click="window.App.cambiarVista('marketplace'); window.App.cerrarMenuMovil();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
             <span class="material-symbols-outlined text-[18px] text-violet-700">storefront</span> Marketplace
           </button>
-          <button onclick="window.App.cambiarVista('talento'); window.App.cerrarMenuMovil();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
-            <span class="material-symbols-outlined text-[18px] text-emerald-600">groups</span> Talento
+          <button data-csp-click="window.App.cambiarVista('talento'); window.App.cerrarMenuMovil();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
+            <span class="material-symbols-outlined text-[18px] text-emerald-600">engineering</span> Trabajadores
           </button>
-          <button onclick="window.App.cambiarVista('workspace'); window.App.cerrarMenuMovil();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
+          <button data-csp-click="window.App.cambiarVista('workspace'); window.App.cerrarMenuMovil();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
             <span class="material-symbols-outlined text-[18px] text-indigo-600">terminal</span> Workspace
           </button>
-          <button onclick="window.App.cambiarVista('contratos'); window.App.cerrarMenuMovil();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
+          <button data-csp-click="window.App.cambiarVista('contratos'); window.App.cerrarMenuMovil();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
             <span class="material-symbols-outlined text-[18px] text-amber-600">description</span> Contratos
           </button>
-          <button onclick="window.App.cambiarVista('finanzas'); window.App.cerrarMenuMovil();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
+          <button data-csp-click="window.App.cambiarVista('finanzas'); window.App.cerrarMenuMovil();" class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
             <span class="material-symbols-outlined text-[18px] text-emerald-700">account_balance_wallet</span> Finanzas
           </button>
-          <button id="mobileNavLinkAdmin" onclick="window.App.cambiarVista('admin'); window.App.cerrarMenuMovil();" class="hidden w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-700 dark:text-rose-400">
+          <button id="mobileNavLinkAdmin" data-csp-click="window.App.cambiarVista('admin'); window.App.cerrarMenuMovil();" class="hidden w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-700 dark:text-rose-400">
             <span class="material-symbols-outlined text-[18px]">security</span> Consola Admin
           </button>
         </nav>
@@ -193,10 +198,10 @@
 
       <!-- Footer Menú Móvil -->
       <div class="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
-        <button onclick="window.App.abrirModalLogin(); window.App.cerrarMenuMovil();" class="w-full btn-secondary text-xs justify-center py-2">
+        <button data-csp-click="window.App.abrirModalLogin(); window.App.cerrarMenuMovil();" class="w-full btn-secondary text-xs justify-center py-2">
           <span class="material-symbols-outlined text-[16px]">account_circle</span> Iniciar Sesión / Registro
         </button>
-        <button onclick="window.App.toggleModoOscuro()" class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+        <button data-csp-click="window.App.toggleModoOscuro()" class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
           <span class="material-symbols-outlined text-[16px]">contrast</span> Alternar Modo Oscuro
         </button>
       </div>
@@ -236,12 +241,12 @@
         </div>
 
         <!-- Botón Play / Pause -->
-        <button id="trackerToggleBtn" onclick="window.Timer.toggle()" class="btn-primary py-1 px-2.5 text-xs" title="Iniciar / Pausar Temporizador">
+        <button id="trackerToggleBtn" data-csp-click="window.Timer.toggle()" class="btn-primary py-1 px-2.5 text-xs" title="Iniciar / Pausar Temporizador">
           <span id="trackerToggleIcon" class="material-symbols-outlined text-[18px]">play_arrow</span>
         </button>
 
         <!-- Botón Guardar en MySQL -->
-        <button id="trackerSaveBtn" onclick="window.Timer.guardarSesion()" class="btn-secondary py-1 px-2.5 text-xs text-slate-700" title="Guardar horas acumuladas en la base de datos">
+        <button id="trackerSaveBtn" data-csp-click="window.Timer.guardarSesion()" class="btn-secondary py-1 px-2.5 text-xs text-slate-700" title="Guardar horas acumuladas en la base de datos">
           <span class="material-symbols-outlined text-[17px]">save</span> <span class="hidden md:inline">Guardar Horas</span>
         </button>
       </div>
@@ -252,12 +257,84 @@
   <!-- ================= CONTENEDOR PRINCIPAL DE VISTAS ================= -->
   <main class="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div id="serviceErrorBanner" class="hidden mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200" role="status" aria-live="polite"></div>
-    <div id="viewMarketplace" class="view-panel active"></div>
-    <div id="viewTalento" class="view-panel"></div>
-    <div id="viewWorkspace" class="view-panel"></div>
-    <div id="viewContratos" class="view-panel"></div>
-    <div id="viewFinanzas" class="view-panel"></div>
-    <div id="viewAdmin" class="view-panel"></div>
+
+    <!-- Compuerta de Seguridad: APIs Privadas con Rotación Constante de Tokens -->
+    <div id="privateApiGate" class="hidden mb-8">
+      <div class="max-w-3xl mx-auto fl-card p-8 sm:p-10 border-2 border-violet-200 dark:border-slate-700 shadow-xl relative overflow-hidden">
+        <div class="flex flex-col items-center text-center">
+          <div class="w-16 h-16 rounded-2xl bg-violet-100 dark:bg-violet-950/70 text-violet-700 dark:text-violet-300 flex items-center justify-center mb-4 shadow-sm">
+            <span class="material-symbols-outlined text-[34px]">enhanced_encryption</span>
+          </div>
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold uppercase tracking-wider mb-3">
+            <span class="material-symbols-outlined text-[14px]">shield_lock</span> APIs Privadas · Tokens Rotativos + Cookies HttpOnly
+          </span>
+          <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2">
+            Acceso Protegido contra Filtración de Datos
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-300 max-w-xl leading-relaxed mb-6">
+            Todos los microservicios (<span class="font-mono font-bold">PHP :8000</span>, <span class="font-mono font-bold">Python :5000</span>, <span class="font-mono font-bold">Express :3000</span> y <span class="font-mono font-bold">Gateway :4000</span>) son privados y utilizan el <strong>Flujo de Autenticación con Tokens Rotativos (JWT + Refresh Token) almacenados en Cookies HttpOnly (SameSite=Strict)</strong> que se actualizan cada 30 segundos y son inaccesibles desde JavaScript para impedir robo por XSS.
+          </p>
+
+          <div class="flex flex-wrap items-center justify-center gap-3 mb-6">
+            <button data-csp-click="window.App.abrirModalLogin()" class="btn-primary py-2.5 px-5 text-xs sm:text-sm">
+              <span class="material-symbols-outlined text-[18px]">login</span> Iniciar Sesión con mi Cuenta
+            </button>
+            <button data-csp-click="window.App.abrirModalRegistro()" class="btn-secondary py-2.5 px-4 text-xs sm:text-sm">
+              <span class="material-symbols-outlined text-[18px]">person_add</span> Crear Cuenta Nueva
+            </button>
+          </div>
+
+          <div class="w-full pt-5 border-t border-slate-200 dark:border-slate-800">
+            <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">
+              Acceso Rápido de Demostración (Emite Token Rotativo Real)
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <button
+                data-csp-click="window.App.loginRapidoDemo('freelancer.demo@freelancer.com', 'Demo1234!')"
+                class="p-3 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/60 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-left transition-all">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-600 text-white">Trabajador</span>
+                  <span class="material-symbols-outlined text-[16px] text-emerald-700">engineering</span>
+                </div>
+                <div class="text-xs font-bold text-slate-900 dark:text-white">Mateo Benítez</div>
+                <div class="text-[11px] text-slate-500 font-mono truncate">freelancer.demo@freelancer.com</div>
+              </button>
+
+              <button
+                data-csp-click="window.App.loginRapidoDemo('cliente.demo@freelancer.com', 'Demo1234!')"
+                class="p-3 rounded-xl border border-violet-200 dark:border-violet-900/60 bg-violet-50/60 dark:bg-violet-950/30 hover:bg-violet-100 dark:hover:bg-violet-900/50 text-left transition-all">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-violet-700 text-white">Cliente</span>
+                  <span class="material-symbols-outlined text-[16px] text-violet-700">business_center</span>
+                </div>
+                <div class="text-xs font-bold text-slate-900 dark:text-white">Camila Duarte</div>
+                <div class="text-[11px] text-slate-500 font-mono truncate">cliente.demo@freelancer.com</div>
+              </button>
+
+              <button
+                data-csp-click="window.App.loginRapidoAdminDemo()"
+                class="p-3 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/60 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-left transition-all">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-rose-700 text-white">Admin</span>
+                  <span class="material-symbols-outlined text-[16px] text-rose-700">security</span>
+                </div>
+                <div class="text-xs font-bold text-slate-900 dark:text-white">Administrador</div>
+                <div class="text-[11px] text-slate-500 font-mono truncate">admin@freelancer.com</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="authenticatedViewsContainer">
+      <div id="viewMarketplace" class="view-panel active"></div>
+      <div id="viewTalento" class="view-panel"></div>
+      <div id="viewWorkspace" class="view-panel"></div>
+      <div id="viewContratos" class="view-panel"></div>
+      <div id="viewFinanzas" class="view-panel"></div>
+      <div id="viewAdmin" class="view-panel"></div>
+    </div>
   </main>
 
   <!-- ================= PIE DE PÁGINA ================= -->
@@ -278,7 +355,7 @@
         <span>•</span>
         <a href="/health" target="_blank" class="hover:text-violet-700 dark:hover:text-violet-400 underline">Salud (:4000)</a>
         <span>•</span>
-        <button onclick="window.App.abrirModalAdminLogin()" class="hover:text-rose-600 dark:hover:text-rose-400 flex items-center gap-1 font-semibold text-rose-700 dark:text-rose-400">
+        <button data-csp-click="window.App.abrirModalAdminLogin()" class="hover:text-rose-600 dark:hover:text-rose-400 flex items-center gap-1 font-semibold text-rose-700 dark:text-rose-400">
           <span class="material-symbols-outlined text-[15px]">security</span> Acceso Admin
         </button>
       </div>
@@ -294,12 +371,12 @@
           <h3 class="text-base font-bold text-slate-900 mt-1">Enviar Propuesta de Trabajo</h3>
           <p id="postulacionProyectoTitulo" class="text-xs text-violet-700 font-medium truncate max-w-sm"></p>
         </div>
-        <button onclick="window.App.cerrarModalPostulacion()" class="text-slate-400 hover:text-slate-700">
+        <button data-csp-click="window.App.cerrarModalPostulacion()" class="text-slate-400 hover:text-slate-700">
           <span class="material-symbols-outlined text-[20px]">close</span>
         </button>
       </div>
 
-      <form onsubmit="window.App.enviarPostulacion(event)" class="space-y-4">
+      <form data-csp-submit="window.App.enviarPostulacion(event)" class="space-y-4">
         <input type="hidden" id="postulacionProyectoId"/>
 
         <div>
@@ -331,7 +408,7 @@
         </div>
 
         <div class="pt-3 flex justify-end gap-2 border-t border-slate-100">
-          <button type="button" onclick="window.App.cerrarModalPostulacion()" class="btn-secondary text-xs">Cancelar</button>
+          <button type="button" data-csp-click="window.App.cerrarModalPostulacion()" class="btn-secondary text-xs">Cancelar</button>
           <button type="submit" class="btn-primary text-xs">
             <span class="material-symbols-outlined text-[16px]">send</span> Enviar Propuesta a la BD
           </button>
@@ -349,12 +426,12 @@
           <h3 class="text-base font-bold text-slate-900 dark:text-white mt-1">Publicar Oportunidad en Marketplace</h3>
           <p class="text-xs text-slate-500">Se registrará en Python FastAPI y validará según el esquema de la categoría.</p>
         </div>
-        <button onclick="window.App.cerrarModalPublicarProyecto()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+        <button data-csp-click="window.App.cerrarModalPublicarProyecto()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
           <span class="material-symbols-outlined text-[20px]">close</span>
         </button>
       </div>
 
-      <form onsubmit="window.App.guardarNuevoProyecto(event)" class="space-y-4">
+      <form data-csp-submit="window.App.guardarNuevoProyecto(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Título del Proyecto *</label>
           <input
@@ -371,7 +448,7 @@
             <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Categoría del Proyecto *</label>
             <select
               id="proyTipoSelect"
-              onchange="window.App.renderizarCamposDinamicosProyecto(this.value)"
+              data-csp-change="window.App.renderizarCamposDinamicosProyecto(this.value)"
               class="w-full p-2.5 text-xs rounded-xl border border-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:border-violet-600 font-medium">
               <option value="TECNOLOGIA">Tecnología & Código</option>
               <option value="DISENO">Diseño & UI/UX</option>
@@ -408,7 +485,7 @@
         </div>
 
         <div class="pt-3 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
-          <button type="button" onclick="window.App.cerrarModalPublicarProyecto()" class="btn-secondary text-xs">Cancelar</button>
+          <button type="button" data-csp-click="window.App.cerrarModalPublicarProyecto()" class="btn-secondary text-xs">Cancelar</button>
           <button type="submit" class="btn-primary text-xs">
             <span class="material-symbols-outlined text-[16px]">publish</span> Publicar en MySQL
           </button>
@@ -428,12 +505,12 @@
             <p class="text-xs text-slate-500">Autenticación con JWT sobre microservicio PHP</p>
           </div>
         </div>
-        <button onclick="window.App.cerrarModalLogin()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+        <button data-csp-click="window.App.cerrarModalLogin()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
           <span class="material-symbols-outlined text-[20px]">close</span>
         </button>
       </div>
 
-      <form onsubmit="window.App.manejarLogin(event)" class="space-y-4">
+      <form data-csp-submit="window.App.manejarLogin(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Correo Electrónico</label>
           <div class="relative">
@@ -468,12 +545,12 @@
           </button>
           <div class="text-center text-xs text-slate-500 mt-2">
             ¿No tienes cuenta aún?
-            <button type="button" onclick="window.App.cerrarModalLogin(); window.App.abrirModalRegistro();" class="text-violet-700 dark:text-violet-400 font-bold hover:underline">
+            <button type="button" data-csp-click="window.App.cerrarModalLogin(); window.App.abrirModalRegistro();" class="text-violet-700 dark:text-violet-400 font-bold hover:underline">
               Crear cuenta nueva
             </button>
           </div>
           <div class="text-center text-xs text-slate-500">
-            <button type="button" onclick="window.App.cerrarModalLogin(); window.App.abrirModalAdminLogin();" class="text-rose-700 dark:text-rose-400 font-bold hover:underline">
+            <button type="button" data-csp-click="window.App.cerrarModalLogin(); window.App.abrirModalAdminLogin();" class="text-rose-700 dark:text-rose-400 font-bold hover:underline">
               Acceso exclusivo para administradores
             </button>
           </div>
@@ -495,12 +572,12 @@
             <p class="text-xs text-slate-500">Ingresa con tus credenciales de administrador.</p>
           </div>
         </div>
-        <button type="button" onclick="window.App.cerrarModalAdminLogin()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" aria-label="Cerrar">
+        <button type="button" data-csp-click="window.App.cerrarModalAdminLogin()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" aria-label="Cerrar">
           <span class="material-symbols-outlined text-[20px]">close</span>
         </button>
       </div>
 
-      <form onsubmit="window.App.manejarAdminLogin(event)" class="space-y-4">
+      <form data-csp-submit="window.App.manejarAdminLogin(event)" class="space-y-4">
         <div>
           <label for="adminLoginEmailInput" class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Correo de administrador</label>
           <input id="adminLoginEmailInput" name="email" type="email" autocomplete="username" required class="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 focus:outline-none focus:border-rose-600"/>
@@ -510,7 +587,7 @@
           <input id="adminLoginPasswordInput" name="password" type="password" autocomplete="current-password" minlength="16" required class="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 focus:outline-none focus:border-rose-600"/>
         </div>
         <div class="pt-2 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
-          <button type="button" onclick="window.App.cerrarModalAdminLogin()" class="btn-secondary text-xs">Cancelar</button>
+          <button type="button" data-csp-click="window.App.cerrarModalAdminLogin()" class="btn-secondary text-xs">Cancelar</button>
           <button type="submit" class="btn-primary bg-rose-700 text-xs py-2.5">
             <span class="material-symbols-outlined text-[16px]">verified_user</span> Entrar al panel
           </button>
@@ -528,12 +605,12 @@
           <h3 class="text-base font-bold text-slate-900 dark:text-white mt-1">Registrarse en Freelancer</h3>
           <p class="text-xs text-slate-500">Crea tu perfil con rol asignado y credenciales en MySQL</p>
         </div>
-        <button onclick="window.App.cerrarModalRegistro()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+        <button data-csp-click="window.App.cerrarModalRegistro()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
           <span class="material-symbols-outlined text-[20px]">close</span>
         </button>
       </div>
 
-      <form onsubmit="window.App.manejarRegistro(event)" class="space-y-3.5">
+      <form data-csp-submit="window.App.manejarRegistro(event)" class="space-y-3.5">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Nombre Completo *</label>
@@ -560,14 +637,14 @@
           <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Tipo de Perfil (Rol) *</label>
           <div class="grid grid-cols-2 gap-3">
             <label class="flex items-center gap-2 p-2.5 border rounded-xl cursor-pointer hover:border-violet-600 transition-colors bg-white dark:bg-slate-800">
-              <input type="radio" name="regRolRadio" value="CLIENTE" checked onchange="window.App.renderizarCamposRegistro('CLIENTE')" class="text-violet-600 focus:ring-violet-600"/>
+              <input type="radio" name="regRolRadio" value="CLIENTE" checked data-csp-change="window.App.renderizarCamposRegistro('CLIENTE')" class="text-violet-600 focus:ring-violet-600"/>
               <div>
                 <span class="block text-xs font-bold text-slate-900 dark:text-white">Cliente / Empresa</span>
                 <span class="block text-[10px] text-slate-400">Publicar y contratar</span>
               </div>
             </label>
             <label class="flex items-center gap-2 p-2.5 border rounded-xl cursor-pointer hover:border-violet-600 transition-colors bg-white dark:bg-slate-800">
-              <input type="radio" name="regRolRadio" value="TRABAJADOR" onchange="window.App.renderizarCamposRegistro('TRABAJADOR')" class="text-violet-600 focus:ring-violet-600"/>
+              <input type="radio" name="regRolRadio" value="TRABAJADOR" data-csp-change="window.App.renderizarCamposRegistro('TRABAJADOR')" class="text-violet-600 focus:ring-violet-600"/>
               <div>
                 <span class="block text-xs font-bold text-slate-900 dark:text-white">Freelancer / Talento</span>
                 <span class="block text-[10px] text-slate-400">Postular y trabajar</span>
@@ -582,7 +659,7 @@
         </div>
 
         <div class="pt-2 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
-          <button type="button" onclick="window.App.cerrarModalRegistro()" class="btn-secondary text-xs">Cancelar</button>
+          <button type="button" data-csp-click="window.App.cerrarModalRegistro()" class="btn-secondary text-xs">Cancelar</button>
           <button type="submit" class="btn-primary text-xs">
             <span class="material-symbols-outlined text-[16px]">how_to_reg</span> Registrar Perfil
           </button>
@@ -605,7 +682,7 @@
             <p id="chatModalSubtitulo" class="text-[11px] text-slate-500 font-mono">Conversación sobre la propuesta</p>
           </div>
         </div>
-        <button onclick="window.App.cerrarModalChat()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+        <button data-csp-click="window.App.cerrarModalChat()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
           <span class="material-symbols-outlined text-[20px]">close</span>
         </button>
       </div>
@@ -616,7 +693,7 @@
       </div>
 
       <!-- Formulario de Envío de Mensaje -->
-      <form id="chatForm" onsubmit="window.App.enviarMensajeChat(event)" class="mt-3 flex items-center gap-2">
+      <form id="chatForm" data-csp-submit="window.App.enviarMensajeChat(event)" class="mt-3 flex items-center gap-2">
         <input type="hidden" id="chatPostulacionIdInput"/>
         <input
           id="chatMensajeInput"
@@ -638,7 +715,7 @@
     <div class="modal-window p-6">
       <div class="flex items-start justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
         <h3 id="genericModalTitle" class="text-base font-bold text-slate-900 dark:text-white leading-snug"></h3>
-        <button onclick="window.App.cerrarModalGenerico()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+        <button data-csp-click="window.App.cerrarModalGenerico()" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
           <span class="material-symbols-outlined text-[20px]">close</span>
         </button>
       </div>
@@ -650,16 +727,15 @@
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
 
   <!-- ================= SCRIPTS DE LA APLICACIÓN ================= -->
-  <script src="./js/config.js"></script>
-  <script src="./js/api.js"></script>
-  <script src="./js/state.js"></script>
-  <script src="./js/timer.js"></script>
-  <script src="./js/views/marketplace.js"></script>
-  <script src="./js/views/talento.js"></script>
-  <script src="./js/views/workspace.js"></script>
-  <script src="./js/views/contratos.js"></script>
-  <script src="./js/views/finanzas.js"></script>
-  <script src="./js/views/admin.js"></script>
-  <script src="./js/app.js"></script>
+  <script src="./js/api.js?v=20261109_5"></script>
+  <script src="./js/state.js?v=20261109_5"></script>
+  <script src="./js/timer.js?v=20261109_5"></script>
+  <script src="./js/views/marketplace.js?v=20261109_5"></script>
+  <script src="./js/views/talento.js?v=20261109_5"></script>
+  <script src="./js/views/workspace.js?v=20261109_5"></script>
+  <script src="./js/views/contratos.js?v=20261109_5"></script>
+  <script src="./js/views/finanzas.js?v=20261109_5"></script>
+  <script src="./js/views/admin.js?v=20261109_5"></script>
+  <script src="./js/app.js?v=20261109_5"></script>
 </body>
 </html>

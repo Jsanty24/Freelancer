@@ -132,11 +132,11 @@ const AdminView = {
         </div>
 
         <div class="flex flex-wrap items-center gap-2.5">
-          <button onclick="AdminView.verificarSalud()" class="btn-secondary text-xs">
+          <button data-csp-click="AdminView.verificarSalud()" class="btn-secondary text-xs">
             <span class="material-symbols-outlined text-[16px] ${this.cargandoSalud ? 'animate-spin' : ''}">refresh</span>
             ${this.cargandoSalud ? 'Verificando...' : 'Diagnóstico de Servicios (:4000)'}
           </button>
-          <button onclick="AdminView.exportarAuditoria()" class="btn-primary text-xs">
+          <button data-csp-click="AdminView.exportarAuditoria()" class="btn-primary text-xs">
             <span class="material-symbols-outlined text-[16px]">file_download</span> Exportar Auditoría JSON
           </button>
         </div>
@@ -243,7 +243,7 @@ const AdminView = {
           <div class="flex items-center gap-2">
             <span class="text-xs text-slate-400">Filtrar rol:</span>
             <select
-              onchange="AdminView.setFiltroRol(this.value)"
+              data-csp-change="AdminView.setFiltroRol(this.value)"
               class="text-xs py-1 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-medium">
               <option value="TODOS" ${this.filtroUsuarioRol === 'TODOS' ? 'selected' : ''}>Todos (${usuarios.length})</option>
               <option value="CLIENTE" ${this.filtroUsuarioRol === 'CLIENTE' ? 'selected' : ''}>Clientes (${totalClientes})</option>
@@ -303,7 +303,7 @@ const AdminView = {
           <div class="flex items-center gap-2">
             <span class="text-xs text-slate-400">Filtrar estado:</span>
             <select
-              onchange="AdminView.setFiltroEstado(this.value)"
+              data-csp-change="AdminView.setFiltroEstado(this.value)"
               class="text-xs py-1 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-medium">
               <option value="TODOS" ${this.filtroProyectoEstado === 'TODOS' ? 'selected' : ''}>Todos (${proyectos.length})</option>
               <option value="ABIERTO" ${this.filtroProyectoEstado === 'ABIERTO' ? 'selected' : ''}>Abiertos</option>
@@ -353,7 +353,7 @@ const AdminView = {
                       </td>
                       <td class="py-3 px-4 text-right font-sans">
                         <div class="inline-flex items-center gap-1.5">
-                          <button onclick="AdminView.cambiarEstadoProyectoPrompt(${p.id}, '${p.estado}')" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 text-slate-700 dark:text-slate-200 text-[11px] font-semibold transition-colors">
+                          <button data-csp-click="AdminView.cambiarEstadoProyectoPrompt(${p.id}, '${p.estado}')" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 text-slate-700 dark:text-slate-200 text-[11px] font-semibold transition-colors">
                             Modificar Estado
                           </button>
                         </div>
@@ -401,8 +401,8 @@ const AdminView = {
             </select>
           </div>
           <div class="pt-3 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
-            <button onclick="window.App.cerrarModalGenerico()" class="btn-secondary text-xs">Cancelar</button>
-            <button onclick="AdminView.aplicarCambioEstado(${proyectoId})" class="btn-primary text-xs">Guardar Cambio en BD</button>
+            <button data-csp-click="window.App.cerrarModalGenerico()" class="btn-secondary text-xs">Cancelar</button>
+            <button data-csp-click="AdminView.aplicarCambioEstado(${proyectoId})" class="btn-primary text-xs">Guardar Cambio en BD</button>
           </div>
         </div>
       `;

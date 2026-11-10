@@ -49,18 +49,18 @@ const WorkspaceView = {
 
         <div class="flex flex-wrap items-center gap-3">
           ${esTrabajador ? `
-            <button onclick="WorkspaceView.abrirModalRegistroManual()" class="btn-primary text-xs">
+            <button data-csp-click="WorkspaceView.abrirModalRegistroManual()" class="btn-primary text-xs">
               <span class="material-symbols-outlined text-[16px]">add_alarm</span> Registrar Horas Manuales
             </button>
             ${registrosAprobadosSinFactura.length > 0 ? `
-              <button onclick="window.App.cambiarVista('finanzas')" class="btn-secondary text-xs">
+              <button data-csp-click="window.App.cambiarVista('finanzas')" class="btn-secondary text-xs">
                 <span class="material-symbols-outlined text-[16px]">receipt_long</span> Facturar Aprobadas (${registrosAprobadosSinFactura.length})
               </button>
             ` : ''}
           ` : ''}
           ${puedeAprobar ? `
             ${registrosPendientes.length > 0 ? `
-              <button onclick="WorkspaceView.aprobarTodosPendientes()" class="btn-primary text-xs">
+              <button data-csp-click="WorkspaceView.aprobarTodosPendientes()" class="btn-primary text-xs">
                 <span class="material-symbols-outlined text-[16px]">done_all</span> Aprobar Horas Pendientes (${registrosPendientes.length})
               </button>
             ` : `
@@ -121,7 +121,7 @@ const WorkspaceView = {
               Las asignaciones se generan al aceptar una postulación en Contratos o al contratar directamente a un talento calificado.
             </p>
             <div class="mt-3">
-              <button onclick="window.App.cambiarVista('contratos')" class="btn-primary text-xs">
+              <button data-csp-click="window.App.cambiarVista('contratos')" class="btn-primary text-xs">
                 Ir a Contratos
               </button>
             </div>
@@ -134,38 +134,62 @@ const WorkspaceView = {
               const nombreProy = proy ? proy.nombre_proyecto : `Proyecto #${asig.proyecto_id}`;
               const nombreTrab = trab ? trab.nombre : `Especialista #${asig.trabajador_id}`;
               const timerActivo = Boolean(asig.temporizador_inicio);
+              const esCompletado = proy && proy.estado === 'FINALIZADO';
+              const regsAsig = registrosTiempo.filter(r => Number(r.asignacion_id) === Number(asig.id));
+              let horasAsig = 0;
+              let dineroAsig = 0;
+              regsAsig.forEach(r => {
+                const h = Number(r.horas) || 0;
+                const t = Number(r.tarifa_aplicada || asig.tarifa_por_hora || 70);
+                horasAsig += h;
+                dineroAsig += (h * t);
+              });
 
               return `
                 <div class="fl-card p-4 flex flex-col justify-between">
                   <div>
                     <div class="flex items-start justify-between gap-2 mb-2">
-                      <span class="badge-tech font-mono text-[10px]">Asignación #${asig.id}</span>
+                      <div class="flex items-center gap-1.5">
+                        <span class="badge-tech font-mono text-[10px]">Asignación #${asig.id}</span>
+                        <span class="${esCompletado ? 'badge-success' : 'badge-warning'} text-[10px]">
+                          ${esCompletado ? 'Completado' : 'En Curso'}
+                        </span>
+                      </div>
                       <span class="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400">$${Number(asig.tarifa_por_hora).toFixed(2)}/h</span>
                     </div>
                     <h4 class="font-bold text-slate-900 dark:text-white text-sm mb-1 leading-snug line-clamp-1">${window.App.escapeHTML(nombreProy)}</h4>
                     <p class="text-xs text-slate-500 mb-2">Rol: <strong class="text-slate-700 dark:text-slate-300">${window.App.escapeHTML(asig.rol_en_proyecto)}</strong></p>
-                    <div class="text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/80 p-2 rounded-lg flex items-center justify-between border border-slate-100 dark:border-slate-700">
+                    <div class="text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/80 p-2 rounded-lg flex items-center justify-between border border-slate-100 dark:border-slate-700 mb-2">
                       <span>Trabajador:</span>
                       <span class="font-medium text-slate-800 dark:text-white">${window.App.escapeHTML(nombreTrab)}</span>
                     </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs font-mono bg-slate-50 dark:bg-slate-800/80 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
+                      <div>
+                        <span class="text-[10px] font-sans uppercase text-slate-400 block">Horas Llevadas</span>
+                        <span class="font-bold text-slate-900 dark:text-white">${horasAsig.toFixed(2)} hrs</span>
+                      </div>
+                      <div>
+                        <span class="text-[10px] font-sans uppercase text-slate-400 block">Dinero Ganado</span>
+                        <span class="font-bold text-emerald-700 dark:text-emerald-400">$${dineroAsig.toFixed(2)} USD</span>
+                      </div>
+                    </div>
                   </div>
-                  ${esTrabajador ? `
-                    <div class="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                  <div class="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                    <button data-csp-click="window.TalentoView.abrirDashboardProyecto(${Number(asig.proyecto_id)}, ${Number(asig.id)})" class="btn-primary text-xs py-1 px-2.5">
+                      <span class="material-symbols-outlined text-[14px]">space_dashboard</span> Dashboard & Subir Info
+                    </button>
+                    ${esTrabajador ? `
                       ${timerActivo ? `
-                        <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-                          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span> En curso
-                        </span>
-                        <button onclick="WorkspaceView.detenerTemporizadorServidor(${Number(asig.id)})" class="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold inline-flex items-center gap-1">
-                          <span class="material-symbols-outlined text-[14px]">stop_circle</span> Detener y guardar
+                        <button data-csp-click="WorkspaceView.detenerTemporizadorServidor(${Number(asig.id)})" class="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold inline-flex items-center gap-1">
+                          <span class="material-symbols-outlined text-[14px]">stop_circle</span> Detener (${horasAsig.toFixed(1)}h)
                         </button>
                       ` : `
-                        <span class="text-[11px] text-slate-400">Temporizador BD inactivo</span>
-                        <button onclick="WorkspaceView.iniciarTemporizadorServidor(${Number(asig.id)})" class="btn-secondary text-xs py-1 px-2.5">
-                          <span class="material-symbols-outlined text-[14px]">play_circle</span> Iniciar temporizador
+                        <button data-csp-click="WorkspaceView.iniciarTemporizadorServidor(${Number(asig.id)})" class="btn-secondary text-xs py-1 px-2.5">
+                          <span class="material-symbols-outlined text-[14px]">play_circle</span> Temporizador
                         </button>
                       `}
-                    </div>
-                  ` : ''}
+                    ` : ''}
+                  </div>
                 </div>
               `;
             }).join('')}
@@ -239,7 +263,7 @@ const WorkspaceView = {
                         <td class="py-3 px-4 text-right font-sans">
                           ${reg.estado === 'PENDIENTE' ? (
                             puedeAprobar ? `
-                              <button onclick="WorkspaceView.aprobarRegistro(${Number(reg.id)}, ${tarifaEfectiva})" class="btn-primary text-xs py-1 px-2.5">
+                              <button data-csp-click="WorkspaceView.aprobarRegistro(${Number(reg.id)}, ${tarifaEfectiva})" class="btn-primary text-xs py-1 px-2.5">
                                 <span class="material-symbols-outlined text-[14px]">check_circle</span> Aprobar horas
                               </button>
                             ` : `
@@ -247,7 +271,7 @@ const WorkspaceView = {
                             `
                           ) : reg.estado === 'APROBADO' ? (
                             esTrabajador ? `
-                              <button onclick="window.App.cambiarVista('finanzas')" class="btn-secondary text-xs py-1 px-2.5">
+                              <button data-csp-click="window.App.cambiarVista('finanzas')" class="btn-secondary text-xs py-1 px-2.5">
                                 <span class="material-symbols-outlined text-[14px]">receipt_long</span> Facturar
                               </button>
                             ` : `
@@ -350,7 +374,7 @@ const WorkspaceView = {
     if (modalTitle) modalTitle.textContent = 'Registrar Horas Manuales';
     if (modalBody) {
       modalBody.innerHTML = `
-        <form id="formRegistroManual" onsubmit="WorkspaceView.guardarRegistroManual(event)" class="space-y-4">
+        <form id="formRegistroManual" data-csp-submit="WorkspaceView.guardarRegistroManual(event)" class="space-y-4">
           <div>
             <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Seleccionar Asignación / Proyecto</label>
             <select id="regManualAsigSelect" required class="w-full text-xs p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:border-violet-600">
@@ -379,7 +403,7 @@ const WorkspaceView = {
           </div>
 
           <div class="pt-3 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
-            <button type="button" onclick="window.App.cerrarModalGenerico()" class="btn-secondary text-xs">Cancelar</button>
+            <button type="button" data-csp-click="window.App.cerrarModalGenerico()" class="btn-secondary text-xs">Cancelar</button>
             <button type="submit" class="btn-primary text-xs">Registrar en MySQL</button>
           </div>
         </form>

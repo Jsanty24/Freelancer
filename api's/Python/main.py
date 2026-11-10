@@ -23,7 +23,7 @@ logger = logging.getLogger("api_proyectos")
 
 INTERNAL_API_KEY = (os.getenv("INTERNAL_API_KEY") or "").strip()
 
-RUTAS_PUBLICAS_INTERNAS = {"/", "/health", "/docs", "/redoc", "/openapi.json"}
+RUTAS_PUBLICAS_INTERNAS = {"/", "/health"}
 
 DESCRIPCION = (
     "API de proyectos de la plataforma Freelance. Administra proyectos, sus categorias, "
@@ -83,7 +83,12 @@ async def verificar_clave_interna(request: Request, call_next):
                     "message": "Acceso directo no permitido; use el API Gateway",
                 },
             )
-    return await call_next(request)
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, proxy-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    return response
 
 
 registrar_manejadores(app)

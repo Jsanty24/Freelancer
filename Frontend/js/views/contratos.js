@@ -32,7 +32,7 @@ const ContratosView = {
         </div>
 
         <div class="flex items-center gap-2">
-          <button onclick="window.State.recargarTodo()" class="btn-secondary text-xs">
+          <button data-csp-click="window.State.recargarTodo()" class="btn-secondary text-xs">
             <span class="material-symbols-outlined text-[16px]">sync</span> Sincronizar Microservicios
           </button>
         </div>
@@ -92,7 +92,7 @@ const ContratosView = {
               Las propuestas económicas enviadas por los freelancers para los proyectos abiertos aparecerán aquí.
             </p>
             <div class="mt-4">
-              <button onclick="window.App.cambiarVista('marketplace')" class="btn-primary text-xs">
+              <button data-csp-click="window.App.cambiarVista('marketplace')" class="btn-primary text-xs">
                 <span class="material-symbols-outlined text-[16px]">storefront</span> Explorar Marketplace
               </button>
             </div>
@@ -140,7 +140,7 @@ const ContratosView = {
 
                       <!-- Botón de Chat de Negociación Directa -->
                       <button
-                        onclick="window.App.abrirModalChat(${post.id})"
+                        data-csp-click="window.App.abrirModalChat(${post.id})"
                         class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 text-xs font-semibold hover:bg-violet-100 transition-colors">
                         <span class="material-symbols-outlined text-[16px]">forum</span>
                         Chat de Negociación ${cantidadMensajes > 0 ? `<span class="px-1.5 py-0.2 rounded-full bg-violet-600 text-white text-[10px] font-mono">${cantidadMensajes}</span>` : ''}
@@ -158,10 +158,10 @@ const ContratosView = {
                         ${esCliente ? `
                           <!-- Acciones solo para CLIENTE -->
                           <div class="flex items-center gap-2 w-full md:w-auto">
-                            <button onclick="ContratosView.responder(${post.id}, 'RECHAZADA')" class="px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-semibold transition-all">
+                            <button data-csp-click="ContratosView.responder(${post.id}, 'RECHAZADA')" class="px-3 py-1.5 rounded-lg border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-semibold transition-all">
                               Rechazar
                             </button>
-                            <button onclick="ContratosView.responder(${post.id}, 'ACEPTADA')" class="btn-primary text-xs py-1.5 px-3">
+                            <button data-csp-click="ContratosView.responder(${post.id}, 'ACEPTADA')" class="btn-primary text-xs py-1.5 px-3">
                               <span class="material-symbols-outlined text-[15px]">check</span> Formalizar Contrato
                             </button>
                           </div>

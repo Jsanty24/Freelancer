@@ -76,15 +76,15 @@ const MarketplaceView = {
           </p>
           <div class="flex flex-wrap items-center gap-3">
             ${esCliente ? `
-              <button onclick="window.App.abrirModalPublicarProyecto()" class="btn-primary">
+              <button data-csp-click="window.App.abrirModalPublicarProyecto()" class="btn-primary">
                 <span class="material-symbols-outlined text-[18px]">add_circle</span> Publicar Nuevo Proyecto
               </button>
             ` : `
-              <button onclick="window.App.cambiarVista('talento')" class="btn-primary">
+              <button data-csp-click="window.App.cambiarVista('talento')" class="btn-primary">
                 <span class="material-symbols-outlined text-[18px]">groups</span> Ver Directorio de Talento
               </button>
             `}
-            <button onclick="window.App.cambiarVista('contratos')" class="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium text-sm transition-all flex items-center gap-2 border border-white/15">
+            <button data-csp-click="window.App.cambiarVista('contratos')" class="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium text-sm transition-all flex items-center gap-2 border border-white/15">
               <span class="material-symbols-outlined text-[18px]">description</span> Ver contratos
             </button>
           </div>
@@ -105,7 +105,7 @@ const MarketplaceView = {
             { id: 'ASISTENCIA', label: 'Operaciones' }
           ].map(cat => `
             <button
-              onclick="MarketplaceView.setFiltro('${cat.id}')"
+              data-csp-click="MarketplaceView.setFiltro('${cat.id}')"
               class="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
                 this.filtroActual === cat.id
                   ? 'bg-violet-700 text-white shadow-sm'
@@ -122,7 +122,7 @@ const MarketplaceView = {
           <div class="flex items-center gap-1.5 text-xs text-slate-500 whitespace-nowrap">
             <span class="material-symbols-outlined text-[16px]">sort</span>
             <select
-              onchange="MarketplaceView.setOrden(this.value)"
+              data-csp-change="MarketplaceView.setOrden(this.value)"
               class="text-xs py-1.5 px-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-medium focus:outline-none focus:border-violet-600">
               <option value="recientes" ${this.ordenActual === 'recientes' ? 'selected' : ''}>Más recientes</option>
               <option value="antiguos" ${this.ordenActual === 'antiguos' ? 'selected' : ''}>Más antiguos</option>
@@ -138,7 +138,7 @@ const MarketplaceView = {
               id="marketplaceSearchInput"
               type="text"
               value="${window.App.escapeHTML(this.busqueda)}"
-              oninput="MarketplaceView.debouncedSetBusqueda(this.value)"
+              data-csp-input="MarketplaceView.debouncedSetBusqueda(this.value)"
               placeholder="Buscar proyectos..."
               class="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:border-violet-600 transition-all"
             />
@@ -164,11 +164,11 @@ const MarketplaceView = {
             ${this.busqueda ? `No hay resultados para "<strong>${window.App.escapeHTML(this.busqueda)}</strong>".` : 'No hay oportunidades registradas en esta categoría actualmente.'}
           </p>
           <div class="mt-4 flex items-center justify-center gap-3">
-            <button onclick="MarketplaceView.limpiarFiltros()" class="btn-secondary text-xs">
+            <button data-csp-click="MarketplaceView.limpiarFiltros()" class="btn-secondary text-xs">
               <span class="material-symbols-outlined text-[16px]">restart_alt</span> Limpiar Filtros
             </button>
             ${esCliente ? `
-              <button onclick="window.App.abrirModalPublicarProyecto()" class="btn-primary text-xs">
+              <button data-csp-click="window.App.abrirModalPublicarProyecto()" class="btn-primary text-xs">
                 <span class="material-symbols-outlined text-[16px]">add</span> Publicar el Primer Proyecto
               </button>
             ` : ''}
@@ -192,7 +192,7 @@ const MarketplaceView = {
                     </span>
                   </div>
 
-                  <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-2 leading-snug hover:text-violet-700 transition-colors cursor-pointer" onclick="MarketplaceView.verDetalle(${proy.id})">
+                  <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-2 leading-snug hover:text-violet-700 transition-colors cursor-pointer" data-csp-click="MarketplaceView.verDetalle(${proy.id})">
                     ${window.App.escapeHTML(proy.nombre_proyecto)}
                   </h3>
 
@@ -270,14 +270,14 @@ const MarketplaceView = {
                   </div>
 
                   <div class="flex items-center gap-2">
-                    <button onclick="MarketplaceView.verDetalle(${proy.id})" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-all">
+                    <button data-csp-click="MarketplaceView.verDetalle(${proy.id})" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-all">
                       Detalles
                     </button>
                     ${proy.estado === 'ABIERTO' ? `
                       ${esCliente ? `
                         <span class="text-[11px] text-slate-400 font-medium px-2">Solo Freelancers</span>
                       ` : `
-                        <button onclick="MarketplaceView.abrirModalPostulacion(${proy.id})" class="btn-primary text-xs py-1.5 px-3">
+                        <button data-csp-click="MarketplaceView.abrirModalPostulacion(${proy.id})" class="btn-primary text-xs py-1.5 px-3">
                           <span class="material-symbols-outlined text-[16px]">send</span> Postularme
                         </button>
                       `}
@@ -297,7 +297,7 @@ const MarketplaceView = {
         ${totalPaginas > 1 ? `
           <div class="mt-8 flex items-center justify-center gap-3 font-mono text-xs">
             <button
-              onclick="MarketplaceView.cambiarPagina(${this.paginaActual - 1})"
+              data-csp-click="MarketplaceView.cambiarPagina(${this.paginaActual - 1})"
               ${this.paginaActual <= 1 ? 'disabled class="opacity-40 cursor-not-allowed btn-secondary text-xs py-1.5 px-3"' : 'class="btn-secondary text-xs py-1.5 px-3"'}>
               <span class="material-symbols-outlined text-[16px]">arrow_back</span> Anterior
             </button>
@@ -305,7 +305,7 @@ const MarketplaceView = {
               Página ${this.paginaActual} de ${totalPaginas}
             </span>
             <button
-              onclick="MarketplaceView.cambiarPagina(${this.paginaActual + 1})"
+              data-csp-click="MarketplaceView.cambiarPagina(${this.paginaActual + 1})"
               ${this.paginaActual >= totalPaginas ? 'disabled class="opacity-40 cursor-not-allowed btn-secondary text-xs py-1.5 px-3"' : 'class="btn-secondary text-xs py-1.5 px-3"'}>
               Siguiente <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
             </button>
@@ -384,9 +384,9 @@ const MarketplaceView = {
           </div>
 
           <div class="pt-3 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
-            <button onclick="window.App.cerrarModalGenerico()" class="btn-secondary text-xs">Cerrar</button>
+            <button data-csp-click="window.App.cerrarModalGenerico()" class="btn-secondary text-xs">Cerrar</button>
             ${proy.estado === 'ABIERTO' && esTrabajador ? `
-              <button onclick="window.App.cerrarModalGenerico(); MarketplaceView.abrirModalPostulacion(${proy.id})" class="btn-primary text-xs">
+              <button data-csp-click="window.App.cerrarModalGenerico(); MarketplaceView.abrirModalPostulacion(${proy.id})" class="btn-primary text-xs">
                 Postularme Ahora
               </button>
             ` : ''}

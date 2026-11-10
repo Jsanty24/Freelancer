@@ -50,7 +50,7 @@ const FinanzasView = {
 
         <div class="flex flex-wrap items-center gap-3">
           ${esTrabajador ? `
-            <button onclick="FinanzasView.generarFactura()" class="btn-primary text-xs">
+            <button data-csp-click="FinanzasView.generarFactura()" class="btn-primary text-xs">
               <span class="material-symbols-outlined text-[16px]">receipt_long</span> Facturar horas aprobadas${horasAprobadasListas > 0 ? ` (${horasAprobadasListas.toFixed(2)} h)` : ''}
             </button>
           ` : ''}
@@ -172,19 +172,19 @@ const FinanzasView = {
                         <td class="py-3 px-4 text-right font-sans">
                           <div class="inline-flex flex-wrap items-center justify-end gap-1.5">
                             ${puedeGestionarFactura && fac.estado_factura === 'PENDIENTE' ? `
-                              <button onclick="FinanzasView.aprobarFactura(${Number(fac.id)})" class="btn-primary text-xs py-1 px-2.5">
+                              <button data-csp-click="FinanzasView.aprobarFactura(${Number(fac.id)})" class="btn-primary text-xs py-1 px-2.5">
                                 <span class="material-symbols-outlined text-[14px]">check_circle</span> Aprobar
                               </button>
-                              <button onclick="FinanzasView.cambiarEstadoFactura(${Number(fac.id)}, 'RECHAZADA')" class="px-2.5 py-1 rounded-lg border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-semibold transition-all">
+                              <button data-csp-click="FinanzasView.cambiarEstadoFactura(${Number(fac.id)}, 'RECHAZADA')" class="px-2.5 py-1 rounded-lg border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-semibold transition-all">
                                 Rechazar
                               </button>
                             ` : ''}
                             ${puedeGestionarFactura && fac.estado_factura === 'APROBADA' ? `
-                              <button onclick="FinanzasView.cambiarEstadoFactura(${Number(fac.id)}, 'PAGADA')" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold inline-flex items-center gap-1 transition-all">
+                              <button data-csp-click="FinanzasView.cambiarEstadoFactura(${Number(fac.id)}, 'PAGADA')" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold inline-flex items-center gap-1 transition-all">
                                 <span class="material-symbols-outlined text-[14px]">paid</span> Marcar Pagada
                               </button>
                             ` : ''}
-                            <button onclick="FinanzasView.descargarRecibo(${Number(fac.id)})" class="btn-secondary text-xs py-1 px-2.5">
+                            <button data-csp-click="FinanzasView.descargarRecibo(${Number(fac.id)})" class="btn-secondary text-xs py-1 px-2.5">
                               <span class="material-symbols-outlined text-[14px]">receipt</span> Resumen
                             </button>
                           </div>
@@ -286,7 +286,7 @@ const FinanzasView = {
         </style>
       </head>
       <body>
-        <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar en PDF</button>
+        <button class="btn-print" data-csp-click="window.print()">🖨️ Imprimir / Guardar en PDF</button>
 
         <div class="header">
           <div>

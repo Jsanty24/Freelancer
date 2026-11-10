@@ -1,0 +1,45 @@
+{
+  "1": [
+    {
+      "id": 101,
+      "proyecto_id": 1,
+      "trabajador_id": 8,
+      "autor_nombre": "Mateo Benítez",
+      "titulo": "Sistema de Diseño Tokens & Flujo Checkout Web3",
+      "tipo_entrega": "DISEÑO / PROTOTIPO",
+      "url_recurso": "https://figma.com/file/nexapay-web3-checkout",
+      "archivo_nombre": "nexapay-tokens-v2.fig",
+      "progreso": 75,
+      "descripcion": "Se completaron las pantallas del flujo de pago Web3, estados de carga y validación de billetera con soporte Dark Mode.",
+      "fecha": "2026-11-05 16:30:00"
+    },
+    {
+      "id": 102,
+      "proyecto_id": 1,
+      "trabajador_id": 8,
+      "autor_nombre": "Mateo Benítez",
+      "titulo": "Integración de Componentes React + Tailwind",
+      "tipo_entrega": "CÓDIGO / REPOSITORIO",
+      "url_recurso": "https://github.com/nexapay/web3-checkout-ui/pull/14",
+      "archivo_nombre": "checkout-components-bundle.zip",
+      "progreso": 90,
+      "descripcion": "Implementación responsive de los componentes de confirmación de transacción y recibo descargable.",
+      "fecha": "2026-11-08 11:15:00"
+    }
+  ],
+  "3": [
+    {
+      "id": 103,
+      "proyecto_id": 3,
+      "trabajador_id": 8,
+      "autor_nombre": "Mateo Benítez",
+      "titulo": "Dashboard Clínico B2B — Módulos de Analítica",
+      "tipo_entrega": "AVANCE DE SPRINT",
+      "url_recurso": "https://figma.com/file/bloom-health-analytics",
+      "archivo_nombre": "reporte-ux-bloomhealth.pdf",
+      "progreso": 60,
+      "descripcion": "Entrega de gráficas de cohortes clínicas, filtros por hospital y exportación de métricas.",
+      "fecha": "2026-11-07 14:20:00"
+    }
+  ]
+}

@@ -20,24 +20,40 @@ const App = {
       this.renderizarVistaActual();
     });
 
+    if (window.API && typeof window.API.onTokenRotated === 'function') {
+      window.API.onTokenRotated((meta, activo) => {
+        this.actualizarBadgeToken();
+        if (activo && meta && meta.rot > 1) {
+          const jtiCorto = meta.jti ? String(meta.jti).slice(0, 8) : 'activo';
+          this.mostrarToast(`Token rotado automáticamente (#${meta.rot} · JTI ${jtiCorto})`, 'info');
+        }
+      });
+    }
+
+    setInterval(() => this.actualizarBadgeToken(), 1000);
+    this.iniciarMonitorInactividad();
+
     await this.verificarSesionGuardada();
 
     // Renderizar campos iniciales de formularios dinámicos
     this.renderizarCamposDinamicosProyecto('TECNOLOGIA');
     this.renderizarCamposRegistro('CLIENTE');
 
-    // Cargar datos iniciales vía fetch() con Skeleton
+    // Cargar datos iniciales solo si existe sesión autenticada con token activo
     try {
-      this.mostrarSkeleton('viewMarketplace', 'cards');
-      this.mostrarToast('Conectando con microservicios...', 'info');
-      const datos = await window.State.recargarTodo();
-      const errores = Object.keys(datos.erroresServicios);
-      this.mostrarToast(
-        errores.length
-          ? `Plataforma parcialmente disponible. Servicios con errores: ${errores.join(', ')}.`
-          : 'Datos iniciales de la plataforma cargados.',
-        errores.length ? 'warning' : 'success'
-      );
+      if (window.State.data.usuarioActivo && window.API && window.API.sesionActiva) {
+        this.mostrarSkeleton('viewMarketplace', 'cards');
+        const datos = await window.State.recargarTodo();
+        const errores = Object.keys(datos.erroresServicios);
+        this.mostrarToast(
+          errores.length
+            ? `Plataforma parcialmente disponible. Servicios con errores: ${errores.join(', ')}.`
+            : 'Sesión verificada con Cookie HttpOnly + Token rotativo activo.',
+          errores.length ? 'warning' : 'success'
+        );
+      } else {
+        window.State.limpiarDatosPrivados();
+      }
     } catch (error) {
       this.mostrarToast(`Error al sincronizar datos: ${error.message}`, 'error');
     }
@@ -209,7 +225,7 @@ const App = {
   /* ================= CONTROL DE ACCESO (RBAC) & PERFIL ================= */
   esAdministradorAutenticado() {
     return Boolean(
-      window.API.token &&
+      window.API.sesionActiva &&
       this.usuarioAutenticado &&
       this.usuarioAutenticado.rol === 'ADMIN'
     );
@@ -229,10 +245,15 @@ const App = {
     const navBtnLogout = document.getElementById('navBtnLogout');
     const navLinkAdmin = document.getElementById('navLinkAdmin');
     const mobileNavLinkAdmin = document.getElementById('mobileNavLinkAdmin');
+    const privateApiGate = document.getElementById('privateApiGate');
+    const authViews = document.getElementById('authenticatedViewsContainer');
     const puedeAdministrar = this.esAdministradorAutenticado();
 
     if (navLinkAdmin) navLinkAdmin.classList.toggle('hidden', !puedeAdministrar);
     if (mobileNavLinkAdmin) mobileNavLinkAdmin.classList.toggle('hidden', !puedeAdministrar);
+    if (privateApiGate) privateApiGate.classList.toggle('hidden', Boolean(usuario));
+    if (authViews) authViews.classList.toggle('hidden', !usuario);
+    this.actualizarBadgeToken();
 
     if (usuario) {
       const nombre = usuario.nombre || 'Usuario';
@@ -285,29 +306,34 @@ const App = {
   },
 
   async verificarSesionGuardada() {
-    if (!window.API.token) {
-      localStorage.removeItem('freelancer_active_user');
-      window.State.setUsuarioActivo(null);
-      this.actualizarUIUsuario();
-      return;
-    }
-
     try {
-      const respuesta = await window.API.getCurrentUser();
+      let respuesta = null;
+      try {
+        respuesta = await window.API.getCurrentUser();
+      } catch (err) {
+        if (err && err.status === 401) {
+          await window.API.rotarToken();
+          respuesta = await window.API.getCurrentUser();
+        } else {
+          throw err;
+        }
+      }
+
       const usuario = respuesta && respuesta.data;
       if (!usuario || !usuario.rol) {
         throw new Error('El servidor devolvió una sesión incompleta.');
       }
 
+      window.API.sesionActiva = true;
+      if (!window.API.token) window.API.token = "httponly_cookie_session";
+      window.API.iniciarRotacionAutomatica();
       this.usuarioAutenticado = usuario;
       window.State.setUsuarioActivo(usuario);
     } catch (error) {
-      if (error.status === 401) {
-        window.API.setToken(null);
-        this.usuarioAutenticado = null;
-        window.State.setUsuarioActivo(null);
-      }
-      this.mostrarToast(`No se pudo verificar la sesión guardada: ${error.message}`, 'warning');
+      window.API.setToken(null);
+      this.usuarioAutenticado = null;
+      localStorage.removeItem('freelancer_active_user');
+      window.State.setUsuarioActivo(null);
       this.actualizarUIUsuario();
     }
   },
@@ -388,7 +414,7 @@ const App = {
     try {
       this.mostrarToast('Verificando credenciales de administrador...', 'info');
       const respuesta = await window.API.adminLogin(email, password);
-      if (!window.API.token || !respuesta || !respuesta.usuario || respuesta.usuario.rol !== 'ADMIN') {
+      if (!window.API.sesionActiva || !respuesta || !respuesta.usuario || respuesta.usuario.rol !== 'ADMIN') {
         window.API.setToken(null);
         throw new Error('El servidor no confirmó una sesión de administrador.');
       }
@@ -491,9 +517,6 @@ const App = {
       this.cerrarModalRegistro();
       this.mostrarToast('¡Cuenta registrada exitosamente!', 'success');
 
-      if (res && res.token) {
-        window.API.setToken(res.token);
-      }
       if (res && res.usuario) {
         this.usuarioAutenticado = res.usuario;
         window.State.setUsuarioActivo(res.usuario);
@@ -505,15 +528,212 @@ const App = {
     }
   },
 
-  cerrarSesion() {
-    window.API.setToken(null);
+  actualizarBadgeToken() {
+    const badge = document.getElementById('tokenRotationBadge');
+    const textEl = document.getElementById('tokenRotationText');
+    if (!badge || !textEl) return;
+
+    const autenticado = Boolean(window.State.data.usuarioActivo && window.API && window.API.sesionActiva);
+    if (!autenticado) {
+      badge.classList.add('hidden');
+      badge.classList.remove('inline-flex');
+      return;
+    }
+
+    badge.classList.remove('hidden');
+    badge.classList.add('inline-flex');
+
+    const meta = (window.API && window.API.tokenMeta) || {};
+    const rot = Number(meta.rot) || 1;
+    const jtiCorto = meta.jti ? String(meta.jti).slice(0, 6) : 'jwt';
+    const intervalo = Number(meta.rotation_interval_seconds) || 30;
+    const transcurrido = Math.floor((Date.now() - (meta.last_rotated_ms || Date.now())) / 1000);
+    const restante = Math.max(1, intervalo - (transcurrido % intervalo));
+
+    textEl.textContent = `HttpOnly #${rot} [${jtiCorto}] · ${restante}s`;
+  },
+
+  iniciarMonitorInactividad() {
+    this.ultimaActividadMs = Date.now();
+    const TIMEOUT_INACTIVIDAD_MS = 10 * 60 * 1000; // 10 minutos
+    const registrarActividad = () => {
+      this.ultimaActividadMs = Date.now();
+    };
+    ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(ev => {
+      window.addEventListener(ev, registrarActividad, { passive: true });
+    });
+    setInterval(async () => {
+      if (!window.State.data.usuarioActivo || !window.API || !window.API.sesionActiva) return;
+      if (Date.now() - (this.ultimaActividadMs || Date.now()) > TIMEOUT_INACTIVIDAD_MS) {
+        this.mostrarToast('Sesión bloqueada automáticamente por inactividad (protección anti-fuga).', 'warning');
+        await this.cerrarSesion();
+      }
+    }, 15000);
+  },
+
+  async rotarTokenAhora(recargarModalSeguridad = false) {
+    if (!window.API || !window.API.sesionActiva) return;
+    try {
+      const res = await window.API.rotarToken();
+      this.actualizarBadgeToken();
+      const jtiCorto = res && res.jti ? String(res.jti).slice(0, 8) : 'nuevo';
+      this.mostrarToast(`Token rotado manualmente (#${res.rot || 1} · JTI ${jtiCorto}). El token anterior fue invalidado.`, 'success');
+      if (recargarModalSeguridad) {
+        await this.abrirModalCentroSeguridad();
+      }
+    } catch (error) {
+      this.mostrarToast(`No se pudo rotar el token: ${error.message}`, 'error');
+    }
+  },
+
+  async abrirModalCentroSeguridad() {
+    if (!window.API || !window.API.sesionActiva) {
+      this.abrirModalLogin();
+      return;
+    }
+
+    const modalTitle = document.getElementById('genericModalTitle');
+    const modalBody = document.getElementById('genericModalContent');
+    if (modalTitle) modalTitle.textContent = 'Centro de Seguridad · Flujo de Tokens + Cookies HttpOnly';
+    if (modalBody) {
+      modalBody.innerHTML = `<div class="py-8 text-center text-xs text-slate-500">Consultando telemetría de seguridad en el API Gateway...</div>`;
+    }
+    this.abrirModalGenerico();
+
+    try {
+      const respuesta = await window.API.getSecurityStatus();
+      const d = (respuesta && respuesta.data) || {};
+      const tok = d.token_actual || {};
+      const capas = Array.isArray(d.capas_activas) ? d.capas_activas : [];
+      const eventos = Array.isArray(d.eventos_recientes) ? d.eventos_recientes : [];
+      const stats = d.estadisticas || {};
+
+      if (modalBody) {
+        modalBody.innerHTML = `
+          <div class="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+            <!-- Estado del Token Rotativo Actual -->
+            <div class="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-emerald-600 text-[22px]">sync_lock</span>
+                  <div>
+                    <div class="text-xs font-bold text-slate-900 dark:text-white">Flujo de Tokens en Cookie HttpOnly Activo (Ciclo #${Number(tok.rot) || 1})</div>
+                    <div class="text-[11px] text-emerald-700 dark:text-emerald-300">Cookies HttpOnly; SameSite=Strict rotando cada ${Number(tok.rotation_interval_seconds) || 30}s · Invisibles a document.cookie y scripts XSS</div>
+                  </div>
+                </div>
+                <button
+                  data-csp-click="window.App.rotarTokenAhora(true)"
+                  class="btn-primary py-1.5 px-3 text-xs bg-emerald-700 hover:bg-emerald-800">
+                  <span class="material-symbols-outlined text-[15px]">autorenew</span> Rotar Token Ahora
+                </button>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono bg-white/80 dark:bg-slate-900/80 p-3 rounded-lg border border-emerald-100 dark:border-emerald-900">
+                <div><span class="text-slate-400">JTI Actual:</span> <span class="font-bold text-slate-800 dark:text-slate-200">${this.escapeHTML(tok.jti || 'N/A')}</span></div>
+                <div><span class="text-slate-400">Huella Dispositivo:</span> <span class="font-bold text-violet-700 dark:text-violet-300">${this.escapeHTML(tok.fgp || 'Vinculada')}</span></div>
+                <div><span class="text-slate-400">Token CSRF:</span> <span class="font-bold text-slate-800 dark:text-slate-200">${this.escapeHTML(tok.csrf_token ? tok.csrf_token.slice(0, 16) + '...' : 'Activo')}</span></div>
+                <div><span class="text-slate-400">Revocados en Blacklist:</span> <span class="font-bold text-rose-600">${Number(stats.tokens_revocados_en_lista_negra) || 0} tokens</span></div>
+              </div>
+            </div>
+
+            <!-- 9 Capas de Seguridad Activas -->
+            <div>
+              <div class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                Capas de Seguridad Activas (Backend APIs + Frontend)
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                ${capas.map(c => `
+                  <div class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 flex items-start gap-2">
+                    <span class="material-symbols-outlined text-emerald-600 text-[17px] mt-0.5">verified_user</span>
+                    <div class="min-w-0">
+                      <div class="text-xs font-bold text-slate-800 dark:text-slate-200">${this.escapeHTML(c.nombre)}</div>
+                      <div class="text-[11px] text-slate-500 leading-snug">${this.escapeHTML(c.detalle)}</div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Bitácora de Auditoría en Tiempo Real -->
+            <div>
+              <div class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                Bitácora de Eventos de Seguridad en Tiempo Real (Gateway)
+              </div>
+              <div class="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <table class="w-full text-left text-[11px]">
+                  <thead class="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold">
+                    <tr>
+                      <th class="py-2 px-2.5">Hora</th>
+                      <th class="py-2 px-2.5">Evento</th>
+                      <th class="py-2 px-2.5">Detalle</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
+                    ${eventos.map(ev => `
+                      <tr>
+                        <td class="py-1.5 px-2.5 text-slate-400 whitespace-nowrap">${this.escapeHTML((ev.fecha || '').slice(11))}</td>
+                        <td class="py-1.5 px-2.5 font-bold ${ev.severidad === 'CRITICO' ? 'text-rose-600' : (ev.severidad === 'WARN' ? 'text-amber-600' : 'text-emerald-700 dark:text-emerald-400')}">${this.escapeHTML(ev.tipo)}</td>
+                        <td class="py-1.5 px-2.5 text-slate-600 dark:text-slate-300 font-sans">${this.escapeHTML(ev.detalle)}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    } catch (error) {
+      if (modalBody) {
+        modalBody.innerHTML = `<div class="p-4 text-xs text-rose-600">Error consultando estado de seguridad: ${this.escapeHTML(error.message)}</div>`;
+      }
+    }
+  },
+
+  async loginRapidoDemo(email, password) {
+    try {
+      this.mostrarToast(`Iniciando sesión segura (${email})...`, 'info');
+      const res = await window.API.login(email, password);
+      if (res && res.usuario) {
+        this.usuarioAutenticado = res.usuario;
+        window.State.setUsuarioActivo(res.usuario);
+        this.cerrarModalLogin();
+        await window.State.recargarTodo();
+        this.actualizarUIUsuario();
+        this.renderizarVistaActual();
+        this.mostrarToast(`¡Sesión iniciada como ${res.usuario.nombre} (${res.usuario.rol}) con rotación de tokens activa!`, 'success');
+      }
+    } catch (error) {
+      this.mostrarToast(`Error en acceso rápido: ${error.message}`, 'error');
+    }
+  },
+
+  async loginRapidoAdminDemo() {
+    try {
+      this.mostrarToast('Iniciando sesión de Administrador...', 'info');
+      const respuesta = await window.API.adminLogin('admin@freelancer.com', 'AdminFreelancer2026!');
+      if (respuesta && respuesta.usuario) {
+        this.usuarioAutenticado = respuesta.usuario;
+        window.State.setUsuarioActivo(respuesta.usuario);
+        this.cerrarModalAdminLogin();
+        await window.State.recargarTodo();
+        this.actualizarUIUsuario();
+        this.cambiarVista('admin');
+        this.mostrarToast('Sesión de Administrador iniciada con tokens rotativos.', 'success');
+      }
+    } catch (error) {
+      this.mostrarToast(`Error en acceso Admin: ${error.message}`, 'error');
+    }
+  },
+
+  async cerrarSesion() {
+    await window.API.cerrarSesionRemota();
     this.usuarioAutenticado = null;
     localStorage.removeItem('freelancer_active_user');
     if (window.AdminView) window.AdminView.estadoSaludServicios = null;
     window.State.setUsuarioActivo(null);
     window.State.limpiarDatosPrivados();
     if (this.vistaActual === 'admin') this.cambiarVista('marketplace');
-    this.mostrarToast('Has cerrado sesión.', 'info');
+    this.mostrarToast('Sesión cerrada y tokens revocados en el servidor.', 'info');
     this.actualizarUIUsuario();
     this.renderizarVistaActual();
   },
@@ -902,7 +1122,7 @@ const App = {
             <p class="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">${this.escapeHTML(mensaje)}</p>
           </div>
           <div class="pt-2 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
-            <button onclick="window.App.cerrarModalGenerico()" class="btn-secondary text-xs">Cancelar</button>
+            <button data-csp-click="window.App.cerrarModalGenerico()" class="btn-secondary text-xs">Cancelar</button>
             <button id="modalBtnConfirmarAccion" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${colorBoton}">
               ${this.escapeHTML(textoBoton)}
             </button>

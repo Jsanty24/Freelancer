@@ -1,11 +1,21 @@
 require('dotenv').config();
+const crypto = require('crypto');
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
 
 const app = express();
+app.disable('x-powered-by');
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
+
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    next();
+});
 
 const db = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
@@ -79,11 +89,34 @@ app.use((req, res, next) => {
         return next();
     }
     const claveRecibida = req.header('X-Internal-Key') || '';
-    if (!INTERNAL_API_KEY || claveRecibida !== INTERNAL_API_KEY) {
+    const bufRecibida = Buffer.from(String(claveRecibida));
+    const bufEsperada = Buffer.from(String(INTERNAL_API_KEY));
+    if (!INTERNAL_API_KEY || bufRecibida.length !== bufEsperada.length || !crypto.timingSafeEqual(bufRecibida, bufEsperada)) {
         return res.status(403).json({
             status: 'error',
             message: 'Acceso directo no permitido; use el API Gateway'
         });
+    }
+
+    const tokenInterno = req.header('X-Internal-Token') || '';
+    if (tokenInterno) {
+        const partes = tokenInterno.split('.');
+        if (partes.length !== 3) {
+            return res.status(403).json({ status: 'error', message: 'Token interno rotativo malformado' });
+        }
+        const [tsStr, nonce, firmaRecibida] = partes;
+        const ahora = Math.floor(Date.now() / 1000);
+        const ts = Number(tsStr);
+        if (!Number.isFinite(ts) || Math.abs(ahora - ts) > 60) {
+            return res.status(403).json({ status: 'error', message: 'Token interno rotativo expirado (anti-replay)' });
+        }
+        const payload = `${tsStr}.${nonce}.${req.method.toUpperCase()}.${req.originalUrl}`;
+        const firmaEsperada = crypto.createHmac('sha256', INTERNAL_API_KEY).update(payload).digest('hex');
+        const bFirmaRec = Buffer.from(firmaRecibida);
+        const bFirmaEsp = Buffer.from(firmaEsperada);
+        if (bFirmaRec.length !== bFirmaEsp.length || !crypto.timingSafeEqual(bFirmaRec, bFirmaEsp)) {
+            return res.status(403).json({ status: 'error', message: 'Firma de token interno rotativo inválida' });
+        }
     }
     next();
 });

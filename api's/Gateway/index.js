@@ -1,16 +1,176 @@
 require('dotenv').config();
+const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+app.disable('x-powered-by');
+const ORIGENES_PERMITIDOS = new Set([
+    'http://localhost:4000',
+    'http://127.0.0.1:4000',
+    'http://localhost:5500',
+    'http://127.0.0.1:5500',
+    'capacitor://localhost',
+    'http://localhost'
+]);
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin || ORIGENES_PERMITIDOS.has(origin)) {
+            return callback(null, origin || true);
+        }
+        return callback(null, false);
+    },
+    credentials: true,
+    exposedHeaders: [
+        'X-CSRF-Token',
+        'X-RateLimit-Limit',
+        'X-RateLimit-Remaining',
+        'X-RateLimit-Reset'
+    ]
+}));
+app.use(express.json({ limit: '100kb' }));
+
+// =========================================================================
+// FLUJO DE AUTENTICACIÓN CON TOKENS ROTATIVOS + COOKIES HTTPONLY (SIN EXPOSICIÓN EN BODY NI CABECERAS)
+// =========================================================================
+const COOKIE_ACCESS_TOKEN = 'freelancer_access_token';
+const COOKIE_REFRESH_TOKEN = 'freelancer_refresh_token';
+const COOKIE_CSRF_TOKEN = 'freelancer_csrf_token';
+
+function parsearCookies(req) {
+    const lista = {};
+    const headerCookie = req && req.headers ? req.headers.cookie : '';
+    if (!headerCookie) return lista;
+    for (const par of String(headerCookie).split(';')) {
+        const idx = par.indexOf('=');
+        if (idx < 0) continue;
+        const clave = par.slice(0, idx).trim();
+        const valor = par.slice(idx + 1).trim();
+        if (!clave) continue;
+        try {
+            lista[clave] = decodeURIComponent(valor);
+        } catch {
+            lista[clave] = valor;
+        }
+    }
+    // Soportar prefijo __Host- en producción HTTPS de forma transparente
+    if (lista[`__Host-${COOKIE_ACCESS_TOKEN}`] && !lista[COOKIE_ACCESS_TOKEN]) {
+        lista[COOKIE_ACCESS_TOKEN] = lista[`__Host-${COOKIE_ACCESS_TOKEN}`];
+    }
+    if (lista[`__Host-${COOKIE_REFRESH_TOKEN}`] && !lista[COOKIE_REFRESH_TOKEN]) {
+        lista[COOKIE_REFRESH_TOKEN] = lista[`__Host-${COOKIE_REFRESH_TOKEN}`];
+    }
+    if (lista[`__Host-${COOKIE_CSRF_TOKEN}`] && !lista[COOKIE_CSRF_TOKEN]) {
+        lista[COOKIE_CSRF_TOKEN] = lista[`__Host-${COOKIE_CSRF_TOKEN}`];
+    }
+    return lista;
+}
+
+function esConexionSegura(req) {
+    if (process.env.NODE_ENV === 'production' || process.env.FORCE_SECURE_COOKIES === 'true') {
+        return true;
+    }
+    if (!req) return false;
+    return Boolean(req.secure || String(req.headers?.['x-forwarded-proto'] || '').toLowerCase() === 'https');
+}
+
+function establecerCookiesAuthHttpOnly(res, parTokens, req = null) {
+    if (!res || !parTokens) return;
+    const esHttps = esConexionSegura(req);
+    const prefijo = esHttps ? '__Host-' : '';
+    const secureFlag = esHttps ? '; Secure' : '';
+    const maxAgeAccess = Number(parTokens.expires_in) || 180;
+    const maxAgeRefresh = 28800;
+
+    const cookies = [
+        `${prefijo}${COOKIE_ACCESS_TOKEN}=${encodeURIComponent(parTokens.token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAgeAccess}${secureFlag}`,
+        `${prefijo}${COOKIE_REFRESH_TOKEN}=${encodeURIComponent(parTokens.refresh_token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAgeRefresh}${secureFlag}`,
+        `${prefijo}${COOKIE_CSRF_TOKEN}=${encodeURIComponent(parTokens.csrf_token || '')}; SameSite=Strict; Path=/; Max-Age=${maxAgeRefresh}${secureFlag}`
+    ];
+    res.setHeader('Set-Cookie', cookies);
+}
+
+function limpiarCookiesAuthHttpOnly(res, req = null) {
+    if (!res) return;
+    const esHttps = esConexionSegura(req);
+    const prefijo = esHttps ? '__Host-' : '';
+    const secureFlag = esHttps ? '; Secure' : '';
+    res.setHeader('Set-Cookie', [
+        `${prefijo}${COOKIE_ACCESS_TOKEN}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT${secureFlag}`,
+        `${prefijo}${COOKIE_REFRESH_TOKEN}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT${secureFlag}`,
+        `${prefijo}${COOKIE_CSRF_TOKEN}=; SameSite=Strict; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT${secureFlag}`
+    ]);
+}
+
+/**
+ * Elimina `token` y `refresh_token` del body JSON para que NUNCA sean legibles por JS (XSS).
+ * Los tokens reales viajan exclusivamente dentro de las cookies HttpOnly.
+ */
+function sanitizarMetadatosSesionParaBody(parTokens) {
+    if (!parTokens) return {};
+    return {
+        csrf_token: parTokens.csrf_token,
+        rot: parTokens.rot || 1,
+        expires_in: parTokens.expires_in || JWT_EXPIRES_SECONDS,
+        rotation_interval_seconds: parTokens.rotation_interval_seconds || TOKEN_ROTATION_INTERVAL_SECONDS,
+        rotated_at: parTokens.rotated_at || new Date().toISOString(),
+        httponly_cookie: true
+    };
+}
+
+// =========================================================================
+// CAPA 1: CABECERAS DE SEGURIDAD OWASP / HELMET & CONTROL DE CACHÉ (SIN 'unsafe-inline' EN script-src)
+// =========================================================================
+function compararTiempoConstante(a, b) {
+    const strA = String(a || '');
+    const strB = String(b || '');
+    if (!strA || !strB || strA.length !== strB.length) return false;
+    return crypto.timingSafeEqual(Buffer.from(strA, 'utf8'), Buffer.from(strB, 'utf8'));
+}
+
+app.use((req, res, next) => {
+    const esRecursoFrontend =
+        req.path === '/' ||
+        req.path.startsWith('/app') ||
+        req.path.startsWith('/js/') ||
+        req.path.startsWith('/css/') ||
+        req.path.startsWith('/public/') ||
+        req.path.endsWith('.html') ||
+        req.path.endsWith('.css') ||
+        req.path.endsWith('.js') ||
+        req.path.endsWith('.svg');
+
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '0');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+
+    if (esRecursoFrontend) {
+        res.setHeader(
+            'Content-Security-Policy',
+            "default-src 'self'; script-src 'self' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' http://localhost:4000 http://127.0.0.1:4000; object-src 'none'; frame-ancestors 'none'; base-uri 'self';"
+        );
+    } else {
+        // CSP estricto para respuestas JSON de la API (cero ejecución de scripts o recursos externos)
+        res.setHeader(
+            'Content-Security-Policy',
+            "default-src 'none'; script-src 'none'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none';"
+        );
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+    }
+    next();
+});
 
 const FRONTEND_DIR = path.resolve(__dirname, '../../Frontend');
-app.use('/app', express.static(FRONTEND_DIR));
-app.use(express.static(FRONTEND_DIR));
+app.use('/app', express.static(FRONTEND_DIR, { etag: false, maxAge: 0 }));
+app.use(express.static(FRONTEND_DIR, { etag: false, maxAge: 0 }));
 app.get('/', (req, res) => {
     res.redirect('/app/index.html');
 });
@@ -21,12 +181,169 @@ const PYTHON_API_URL = (process.env.PYTHON_API_URL || 'http://127.0.0.1:5000').r
 const EXPRESS_API_URL = (process.env.EXPRESS_API_URL || 'http://127.0.0.1:3000').replace(/\/+$/, '');
 const INTERNAL_API_KEY = (process.env.INTERNAL_API_KEY || '').trim();
 const JWT_SECRET = (process.env.JWT_SECRET || '').trim();
-const JWT_EXPIRES_SECONDS = Number(process.env.JWT_EXPIRES_SECONDS) || 86400;
+const JWT_EXPIRES_SECONDS = Number(process.env.JWT_EXPIRES_SECONDS) || 180;
+const TOKEN_ROTATION_INTERVAL_SECONDS = Number(process.env.TOKEN_ROTATION_INTERVAL_SECONDS) || 30;
+const TOKEN_GRACE_PERIOD_SECONDS = 12;
+const REFRESH_TOKEN_TTL_SECONDS = 28800; // 8 horas de sesión máxima con rotación constante
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').toLowerCase().trim();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const ADMIN_LOGIN_CONFIGURED =
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ADMIN_EMAIL) &&
     ADMIN_PASSWORD.length >= 16;
+
+// Registro en memoria de sesiones activas, tokens revocados, detección de robo y bitácora WAF
+const sesionesActivas = new Map();
+const tokensRevocados = new Map();
+const refreshTokensUsados = new Map(); // hash -> { sid, usedAt } (detección de robo/reuso de refresh token)
+const rateLimitPorIp = new Map();
+const intentosLoginFallidos = new Map();
+const eventosSeguridad = [];
+
+function registrarEventoSeguridad(tipo, severidad, detalle, req = null) {
+    const ip = req ? (req.ip || req.socket?.remoteAddress || '127.0.0.1') : 'sistema';
+    eventosSeguridad.unshift({
+        id: crypto.randomUUID().slice(0, 8),
+        fecha: new Date().toISOString().slice(0, 19).replace('T', ' '),
+        tipo,
+        severidad, // 'INFO' | 'WARN' | 'CRITICO'
+        ip,
+        ruta: req ? `${req.method} ${req.originalUrl}` : '-',
+        detalle
+    });
+    if (eventosSeguridad.length > 60) {
+        eventosSeguridad.length = 60;
+    }
+}
+
+function obtenerHuellaCliente(req) {
+    if (!req) return 'internal';
+    const ua = String(req.header('User-Agent') || 'unknown-agent').trim();
+    return crypto.createHash('sha256').update(ua).digest('hex').slice(0, 16);
+}
+
+// =========================================================================
+// CAPA 2: RATE LIMITING GLOBAL Y ANTI-FUERZA BRUTA
+// =========================================================================
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX_REQ = 240;
+const LOGIN_MAX_INTENTOS = 5;
+const LOGIN_BLOQUEO_MS = 5 * 60 * 1000;
+
+app.use((req, res, next) => {
+    if (req.path.startsWith('/app') || req.path.endsWith('.js') || req.path.endsWith('.css') || req.path.endsWith('.svg')) {
+        return next();
+    }
+    const ip = req.ip || req.socket?.remoteAddress || '127.0.0.1';
+    const ahoraMs = Date.now();
+    let registro = rateLimitPorIp.get(ip);
+    if (!registro || ahoraMs > registro.resetAt) {
+        registro = { count: 0, resetAt: ahoraMs + RATE_LIMIT_WINDOW_MS };
+        rateLimitPorIp.set(ip, registro);
+    }
+    registro.count += 1;
+    const restantes = Math.max(0, RATE_LIMIT_MAX_REQ - registro.count);
+    res.setHeader('X-RateLimit-Limit', String(RATE_LIMIT_MAX_REQ));
+    res.setHeader('X-RateLimit-Remaining', String(restantes));
+    res.setHeader('X-RateLimit-Reset', String(Math.ceil(registro.resetAt / 1000)));
+
+    if (registro.count > RATE_LIMIT_MAX_REQ) {
+        registrarEventoSeguridad('RATE_LIMIT_EXCEEDED', 'WARN', `Límite de ${RATE_LIMIT_MAX_REQ} req/min excedido`, req);
+        return res.status(429).json({
+            status: 'error',
+            code: 'RATE_LIMIT_EXCEEDED',
+            message: 'Demasiadas peticiones desde esta dirección IP. Espera unos segundos antes de reintentar.'
+        });
+    }
+    next();
+});
+
+// =========================================================================
+// CAPA 3: WAF LIGERO (ANTI-XSS, ANTI-SQLi, ANTI-PROTOTYPE POLLUTION)
+// =========================================================================
+const PATRONES_ATAQUE_WAF = [
+    /<\s*script\b/i,
+    /javascript\s*:/i,
+    /\bon(?:error|load|mouseover|focus|click)\s*=/i,
+    /<\s*(?:iframe|object|embed|svg\s+onload)\b/i,
+    /\bUNION\s+ALL?\s+SELECT\b/i,
+    /;\s*DROP\s+TABLE\b/i
+];
+
+function inspeccionarYSanitizarValor(valor) {
+    if (typeof valor === 'string') {
+        const limpio = valor.replace(/\0/g, '');
+        for (const patron of PATRONES_ATAQUE_WAF) {
+            if (patron.test(limpio)) {
+                const err = new Error('Se detectó un patrón de inyección malicioso (XSS / SQLi) bloqueado por el WAF.');
+                err.wafBlocked = true;
+                throw err;
+            }
+        }
+        return limpio;
+    }
+    if (Array.isArray(valor)) {
+        return valor.map(inspeccionarYSanitizarValor);
+    }
+    if (valor && typeof valor === 'object') {
+        const resultado = {};
+        for (const [k, v] of Object.entries(valor)) {
+            if (k === '__proto__' || k === 'constructor' || k === 'prototype') {
+                const err = new Error('Intento de contaminación de prototipo (Prototype Pollution) bloqueado.');
+                err.wafBlocked = true;
+                throw err;
+            }
+            resultado[k] = inspeccionarYSanitizarValor(v);
+        }
+        return resultado;
+    }
+    return valor;
+}
+
+app.use((req, res, next) => {
+    try {
+        if (req.body && typeof req.body === 'object') {
+            req.body = inspeccionarYSanitizarValor(req.body);
+        }
+        if (req.query && typeof req.query === 'object') {
+            req.query = inspeccionarYSanitizarValor(req.query);
+        }
+        next();
+    } catch (err) {
+        if (err.wafBlocked) {
+            registrarEventoSeguridad('WAF_PAYLOAD_BLOCKED', 'CRITICO', err.message, req);
+            return res.status(400).json({
+                status: 'error',
+                code: 'WAF_BLOCKED',
+                message: err.message
+            });
+        }
+        next(err);
+    }
+});
+
+function limpiarTokensExpirados() {
+    const ahora = Math.floor(Date.now() / 1000);
+    for (const [jti, exp] of tokensRevocados.entries()) {
+        if (ahora > exp + 60) {
+            tokensRevocados.delete(jti);
+        }
+    }
+    for (const [sid, sesion] of sesionesActivas.entries()) {
+        if (ahora > sesion.expiresAt) {
+            sesionesActivas.delete(sid);
+        }
+    }
+    for (const [hash, info] of refreshTokensUsados.entries()) {
+        if (ahora > info.usedAt + 3600) {
+            refreshTokensUsados.delete(hash);
+        }
+    }
+}
+setInterval(limpiarTokensExpirados, 60000).unref();
+
+function hashTokenOpaco(valor) {
+    return crypto.createHash('sha256').update(String(valor || '')).digest('hex');
+}
 
 function base64UrlEncode(strOrBuffer) {
     return Buffer.from(strOrBuffer)
@@ -44,13 +361,19 @@ function base64UrlDecode(str) {
     return Buffer.from(base64, 'base64').toString('utf8');
 }
 
-function firmarJWT(payloadObj) {
+function firmarJWT(payloadObj, ttlSeconds = JWT_EXPIRES_SECONDS) {
     const header = { alg: 'HS256', typ: 'JWT' };
     const ahora = Math.floor(Date.now() / 1000);
+    const jti = payloadObj.jti || crypto.randomUUID();
+    const sid = payloadObj.sid || crypto.randomUUID();
+    const rot = Number(payloadObj.rot) || 1;
     const payload = {
         ...payloadObj,
+        jti,
+        sid,
+        rot,
         iat: ahora,
-        exp: ahora + JWT_EXPIRES_SECONDS
+        exp: ahora + ttlSeconds
     };
     const segmentoHeader = base64UrlEncode(JSON.stringify(header));
     const segmentoPayload = base64UrlEncode(JSON.stringify(payload));
@@ -62,7 +385,76 @@ function firmarJWT(payloadObj) {
     return `${datosAFirmar}.${base64UrlEncode(firma)}`;
 }
 
-function verificarJWT(token) {
+function emitirParTokens(usuarioPayload, sesionExistente = null, req = null) {
+    const ahora = Math.floor(Date.now() / 1000);
+    const sid = sesionExistente ? sesionExistente.sid : crypto.randomUUID();
+    const rot = sesionExistente ? (Number(sesionExistente.rotCount) || 1) + 1 : 1;
+    const nuevoJti = crypto.randomUUID();
+    const refreshToken = crypto.randomBytes(32).toString('hex');
+    const csrfToken = sesionExistente && sesionExistente.csrfToken
+        ? sesionExistente.csrfToken
+        : crypto.randomBytes(24).toString('hex');
+    const fgp = sesionExistente && sesionExistente.fgp
+        ? sesionExistente.fgp
+        : obtenerHuellaCliente(req);
+
+    if (sesionExistente) {
+        if (sesionExistente.previousJti) {
+            tokensRevocados.set(sesionExistente.previousJti, ahora + JWT_EXPIRES_SECONDS);
+        }
+        if (sesionExistente.refreshTokenHash) {
+            refreshTokensUsados.set(sesionExistente.refreshTokenHash, {
+                sid,
+                usedAt: ahora
+            });
+        }
+    }
+
+    const sesion = {
+        sid,
+        userPayload: {
+            sub: String(usuarioPayload.sub),
+            rol: String(usuarioPayload.rol).toUpperCase(),
+            nombre: usuarioPayload.nombre,
+            email: usuarioPayload.email
+        },
+        currentJti: nuevoJti,
+        previousJti: sesionExistente ? sesionExistente.currentJti : null,
+        previousJtiValidUntil: sesionExistente ? (ahora + TOKEN_GRACE_PERIOD_SECONDS) : 0,
+        refreshTokenHash: hashTokenOpaco(refreshToken),
+        csrfToken,
+        fgp,
+        rotCount: rot,
+        lastRotatedAt: ahora,
+        createdAt: sesionExistente ? sesionExistente.createdAt : ahora,
+        expiresAt: ahora + REFRESH_TOKEN_TTL_SECONDS
+    };
+
+    sesionesActivas.set(sid, sesion);
+
+    const token = firmarJWT({
+        ...sesion.userPayload,
+        jti: nuevoJti,
+        sid,
+        rot,
+        fgp
+    }, JWT_EXPIRES_SECONDS);
+
+    return {
+        token,
+        refresh_token: refreshToken,
+        csrf_token: csrfToken,
+        jti: nuevoJti,
+        sid,
+        rot,
+        fgp,
+        expires_in: JWT_EXPIRES_SECONDS,
+        rotation_interval_seconds: TOKEN_ROTATION_INTERVAL_SECONDS,
+        rotated_at: new Date(ahora * 1000).toISOString()
+    };
+}
+
+function verificarJWT(token, req = null) {
     const partes = String(token || '').split('.');
     if (partes.length !== 3) {
         throw new Error('Formato de token inválido');
@@ -86,25 +478,159 @@ function verificarJWT(token) {
         err.expired = true;
         throw err;
     }
+
+    if (payload.jti && tokensRevocados.has(payload.jti)) {
+        const err = new Error('El token fue revocado o reemplazado por rotación de seguridad');
+        err.revoked = true;
+        throw err;
+    }
+
+    // Verificar vinculación de dispositivo (Fingerprint Binding) si aplica
+    if (req && payload.fgp && payload.fgp !== 'internal') {
+        const fgpActual = obtenerHuellaCliente(req);
+        if (payload.fgp !== fgpActual) {
+            registrarEventoSeguridad('FINGERPRINT_MISMATCH', 'CRITICO', `Posible robo de token (JTI ${payload.jti}) desde otro cliente/navegador`, req);
+            const err = new Error('Token bloqueado: la huella del dispositivo no coincide con la sesión original');
+            err.revoked = true;
+            throw err;
+        }
+    }
+
+    if (payload.sid && sesionesActivas.has(payload.sid)) {
+        const sesion = sesionesActivas.get(payload.sid);
+        const esActual = payload.jti === sesion.currentJti;
+        const enVentanaGracia = payload.jti === sesion.previousJti && ahora <= sesion.previousJtiValidUntil;
+        if (!esActual && !enVentanaGracia) {
+            tokensRevocados.set(payload.jti, ahora + JWT_EXPIRES_SECONDS);
+            const err = new Error('Token antiguo invalidado tras rotación automática');
+            err.revoked = true;
+            throw err;
+        }
+    }
+
     return payload;
 }
 
 app.use((req, res, next) => {
+    req.cookies = parsearCookies(req);
     const authHeader = req.header('Authorization') || '';
-    if (authHeader.toLowerCase().startsWith('bearer ')) {
-        const token = authHeader.slice(7).trim();
+    const tokenDesdeHeader = authHeader.toLowerCase().startsWith('bearer ')
+        ? authHeader.slice(7).trim()
+        : '';
+    const tokenDesdeCookieHttpOnly = req.cookies[COOKIE_ACCESS_TOKEN] || '';
+    const candidatos = [];
+    if (tokenDesdeCookieHttpOnly) candidatos.push({ valor: tokenDesdeCookieHttpOnly, origen: 'httponly_cookie' });
+    if (tokenDesdeHeader && tokenDesdeHeader !== tokenDesdeCookieHttpOnly) {
+        candidatos.push({ valor: tokenDesdeHeader, origen: 'bearer_header' });
+    }
+
+    if (candidatos.length > 0) {
         try {
-            const payload = verificarJWT(token);
+            let payload = null;
+            let origenToken = null;
+            let ultimoError = null;
+            for (const cand of candidatos) {
+                try {
+                    payload = verificarJWT(cand.valor, req);
+                    origenToken = cand.origen;
+                    break;
+                } catch (e) {
+                    ultimoError = e;
+                }
+            }
+            if (!payload) {
+                throw ultimoError || new Error('Token inválido');
+            }
+            const sesion = payload.sid ? sesionesActivas.get(payload.sid) : null;
+
+            // Validar protección CSRF estricta (Double-Submit Cookie === X-CSRF-Token Header === Sesión) en POST/PUT/PATCH/DELETE
+            if (
+                sesion &&
+                sesion.csrfToken &&
+                ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method.toUpperCase()) &&
+                req.path !== '/auth/login' &&
+                req.path !== '/login' &&
+                req.path !== '/auth/admin-login' &&
+                req.path !== '/auth/registro'
+            ) {
+                const csrfHeader = req.header('X-CSRF-Token') || '';
+                const csrfCookie = req.cookies[COOKIE_CSRF_TOKEN] || '';
+
+                if (origenToken === 'httponly_cookie') {
+                    const headerCoincideCookie = csrfCookie ? compararTiempoConstante(csrfHeader, csrfCookie) : true;
+                    const headerCoincideSesion = compararTiempoConstante(csrfHeader, sesion.csrfToken);
+                    if (!csrfHeader || !headerCoincideCookie || !headerCoincideSesion) {
+                        registrarEventoSeguridad('CSRF_MISMATCH', 'CRITICO', 'Fallo de validación Double-Submit CSRF (X-CSRF-Token vs Cookie freelancer_csrf_token)', req);
+                        return res.status(403).json({
+                            status: 'error',
+                            code: 'CSRF_INVALID',
+                            message: 'Petición rechazada por protección Anti-CSRF Double-Submit (X-CSRF-Token no coincide con la cookie CSRF).'
+                        });
+                    }
+                } else if (csrfHeader && !compararTiempoConstante(csrfHeader, sesion.csrfToken)) {
+                    registrarEventoSeguridad('CSRF_MISMATCH', 'CRITICO', 'Token CSRF inválido en operación de escritura', req);
+                    return res.status(403).json({
+                        status: 'error',
+                        code: 'CSRF_INVALID',
+                        message: 'Petición rechazada por protección Anti-CSRF (X-CSRF-Token inválido).'
+                    });
+                }
+            }
+
             req.usuario = {
                 id: Number(payload.sub),
                 rol: payload.rol,
                 nombre: payload.nombre,
-                email: payload.email
+                email: payload.email,
+                jti: payload.jti,
+                sid: payload.sid,
+                rot: payload.rot || 1,
+                fgp: payload.fgp || null,
+                csrf_token: sesion ? sesion.csrfToken : null,
+                auth_source: origenToken,
+                httponly: Boolean(tokenDesdeCookieHttpOnly),
+                iat: payload.iat,
+                exp: payload.exp
             };
+
+            if (sesion && sesion.csrfToken) {
+                res.setHeader('X-CSRF-Token', sesion.csrfToken);
+            }
+
+            // Rotación automática transparente cuando el token cumple su ciclo de rotación (actualiza únicamente Cookies HttpOnly + X-CSRF-Token)
+            const ahora = Math.floor(Date.now() / 1000);
+            if (
+                sesion &&
+                payload.jti === sesion.currentJti &&
+                req.path !== '/auth/refresh' &&
+                req.path !== '/auth/logout' &&
+                (ahora - (sesion.lastRotatedAt || payload.iat || ahora)) >= TOKEN_ROTATION_INTERVAL_SECONDS
+            ) {
+                const nuevoPar = emitirParTokens(sesion.userPayload, sesion, req);
+                establecerCookiesAuthHttpOnly(res, nuevoPar, req);
+                res.setHeader('X-CSRF-Token', nuevoPar.csrf_token);
+                registrarEventoSeguridad('TOKEN_AUTO_ROTATED', 'INFO', `Rotación automática en vuelo #${nuevoPar.rot} en Cookie HttpOnly (${sesion.userPayload.email})`, req);
+            }
         } catch (err) {
+            // Si la petición es a un endpoint público de autenticación (/auth/login, /auth/refresh, /health), ignorar cookie expirada
+            if (
+                req.path === '/health' ||
+                req.path === '/login' ||
+                req.path === '/auth/login' ||
+                req.path === '/auth/admin-login' ||
+                req.path === '/auth/registro' ||
+                req.path === '/auth/refresh' ||
+                req.path === '/auth/logout'
+            ) {
+                return next();
+            }
+            registrarEventoSeguridad('AUTH_TOKEN_REJECTED', 'WARN', err.message, req);
             return res.status(401).json({
                 status: 'error',
-                message: err.expired ? 'El token ha expirado' : 'Token inválido'
+                code: err.expired ? 'TOKEN_EXPIRED' : (err.revoked ? 'TOKEN_ROTATED' : 'TOKEN_INVALID'),
+                message: err.expired
+                    ? 'El token ha expirado'
+                    : (err.revoked ? 'El token ya fue rotado o revocado por seguridad' : 'Token inválido')
             });
         }
     }
@@ -115,7 +641,7 @@ function exigirAutenticacion(req, res, next) {
     if (!req.usuario) {
         return res.status(401).json({
             status: 'error',
-            message: 'Falta el token de autenticación. Envía Authorization: Bearer <token>'
+            message: 'Falta el token de autenticación. Inicia sesión para recibir la Cookie HttpOnly o envía Authorization: Bearer <token>'
         });
     }
     next();
@@ -155,13 +681,27 @@ function exigirRoles(...roles) {
     };
 }
 
+function generarTokenInternoRotativo(method, pathConQuery) {
+    const ts = Math.floor(Date.now() / 1000);
+    const nonce = crypto.randomBytes(8).toString('hex');
+    const rutaNormalizada = pathConQuery.startsWith('/') ? pathConQuery : '/' + pathConQuery;
+    const payload = `${ts}.${nonce}.${String(method || 'GET').toUpperCase()}.${rutaNormalizada}`;
+    const firma = crypto
+        .createHmac('sha256', INTERNAL_API_KEY)
+        .update(payload)
+        .digest('hex');
+    return `${ts}.${nonce}.${firma}`;
+}
+
 async function llamarMicroservicio(baseUrl, method, pathConQuery, body = undefined) {
-    const url = `${baseUrl}${pathConQuery.startsWith('/') ? pathConQuery : '/' + pathConQuery}`;
+    const rutaNormalizada = pathConQuery.startsWith('/') ? pathConQuery : '/' + pathConQuery;
+    const url = `${baseUrl}${rutaNormalizada}`;
     const opciones = {
         method,
         headers: {
             'Accept': 'application/json',
-            'X-Internal-Key': INTERNAL_API_KEY
+            'X-Internal-Key': INTERNAL_API_KEY,
+            'X-Internal-Token': generarTokenInternoRotativo(method, rutaNormalizada)
         }
     };
 
@@ -461,7 +1001,51 @@ function esCredencialAdmin(email, password) {
         crypto.timingSafeEqual(contrasenaRecibida, contrasenaConfigurada);
 }
 
-function generarSesionAdmin() {
+function claveIntentoLogin(req, email) {
+    const ip = req ? (req.ip || req.socket?.remoteAddress || '127.0.0.1') : '127.0.0.1';
+    const correo = String(email || '').toLowerCase().trim() || 'anon';
+    return `${ip}:${correo}`;
+}
+
+function verificarBloqueoBruteForce(req, email, res) {
+    const clave = claveIntentoLogin(req, email);
+    const registro = intentosLoginFallidos.get(clave);
+    const ahora = Date.now();
+    if (registro && registro.blockedUntil && ahora < registro.blockedUntil) {
+        const segundosRestantes = Math.ceil((registro.blockedUntil - ahora) / 1000);
+        registrarEventoSeguridad('BRUTE_FORCE_LOCKED', 'CRITICO', `Cuenta/IP bloqueada temporalmente (${email})`, req);
+        res.status(429).json({
+            status: 'error',
+            code: 'BRUTE_FORCE_LOCKED',
+            message: `Demasiados intentos fallidos de inicio de sesión. Bloqueado por seguridad durante ${segundosRestantes}s.`
+        });
+        return true;
+    }
+    return false;
+}
+
+function registrarFalloLogin(req, email) {
+    const clave = claveIntentoLogin(req, email);
+    const ahora = Date.now();
+    let registro = intentosLoginFallidos.get(clave);
+    if (!registro || (registro.blockedUntil && ahora >= registro.blockedUntil)) {
+        registro = { count: 0, blockedUntil: 0 };
+    }
+    registro.count += 1;
+    if (registro.count >= LOGIN_MAX_INTENTOS) {
+        registro.blockedUntil = ahora + LOGIN_BLOQUEO_MS;
+        registrarEventoSeguridad('BRUTE_FORCE_TRIGGERED', 'CRITICO', `Se activó bloqueo anti-fuerza bruta para ${email || 'usuario'}`, req);
+    } else {
+        registrarEventoSeguridad('LOGIN_FAILED', 'WARN', `Intento fallido #${registro.count} (${email || 'desconocido'})`, req);
+    }
+    intentosLoginFallidos.set(clave, registro);
+}
+
+function limpiarFallosLogin(req, email) {
+    intentosLoginFallidos.delete(claveIntentoLogin(req, email));
+}
+
+function generarSesionAdmin(req = null) {
     const adminUser = {
         id: 0,
         nombre: 'Administrador',
@@ -473,39 +1057,51 @@ function generarSesionAdmin() {
             cargo: 'Administrador de la plataforma'
         }
     };
-    const token = firmarJWT({
+    const parTokens = emitirParTokens({
         sub: '0',
         rol: 'ADMIN',
         nombre: adminUser.nombre,
         email: adminUser.email
-    });
+    }, null, req);
+    registrarEventoSeguridad('ADMIN_LOGIN_SUCCESS', 'INFO', `Sesión Admin iniciada (${ADMIN_EMAIL})`, req);
     return {
         status: 'success',
         message: 'Acceso de Administrador autorizado',
-        token,
+        ...parTokens,
         usuario: adminUser
     };
 }
 
 async function manejarLogin(req, res) {
+    const emailIntento = (req.body && req.body.email) || '';
+    if (verificarBloqueoBruteForce(req, emailIntento, res)) {
+        return;
+    }
     try {
         const respuestaLogin = await llamarMicroservicio(PHP_API_URL, 'POST', '/login', req.body);
         if (respuestaLogin.status !== 200 || !respuestaLogin.data || !respuestaLogin.data.data) {
+            if (respuestaLogin.status === 401) {
+                registrarFalloLogin(req, emailIntento);
+            }
             return res.status(respuestaLogin.status).json(respuestaLogin.data);
         }
 
+        limpiarFallosLogin(req, emailIntento);
         const usuario = respuestaLogin.data.data;
-        const token = firmarJWT({
+        const parTokens = emitirParTokens({
             sub: String(usuario.id),
             rol: usuario.rol,
             nombre: usuario.nombre,
             email: usuario.email
-        });
+        }, null, req);
 
+        establecerCookiesAuthHttpOnly(res, parTokens, req);
+        res.setHeader('X-CSRF-Token', parTokens.csrf_token);
+        registrarEventoSeguridad('USER_LOGIN_SUCCESS', 'INFO', `Login exitoso con Cookie HttpOnly: ${usuario.email} (${usuario.rol})`, req);
         return res.status(200).json({
             status: 'success',
-            message: 'Inicio de sesión exitoso',
-            token,
+            message: 'Inicio de sesión exitoso (Cookie HttpOnly + Token Rotativo)',
+            ...sanitizarMetadatosSesionParaBody(parTokens),
             usuario
         });
     } catch (error) {
@@ -526,9 +1122,22 @@ app.post('/auth/admin-login', (req, res) => {
     }
 
     const { email, password } = req.body || {};
-    if (esCredencialAdmin(email, password)) {
-        return res.status(200).json(generarSesionAdmin());
+    if (verificarBloqueoBruteForce(req, email, res)) {
+        return;
     }
+    if (esCredencialAdmin(email, password)) {
+        limpiarFallosLogin(req, email);
+        const sesionAdmin = generarSesionAdmin(req);
+        establecerCookiesAuthHttpOnly(res, sesionAdmin, req);
+        res.setHeader('X-CSRF-Token', sesionAdmin.csrf_token);
+        return res.status(200).json({
+            status: 'success',
+            message: sesionAdmin.message,
+            ...sanitizarMetadatosSesionParaBody(sesionAdmin),
+            usuario: sesionAdmin.usuario
+        });
+    }
+    registrarFalloLogin(req, email);
     return res.status(401).json({
         status: 'error',
         message: 'Correo o contraseña de administrador incorrectos.'
@@ -592,17 +1201,20 @@ app.post('/auth/registro', async (req, res) => {
             perfilCreado = { especialidad, disponibilidad: disponibilidad ?? true };
         }
 
-        const token = firmarJWT({
+        const parTokens = emitirParTokens({
             sub: String(usuarioId),
             rol: rolNormalizado,
             nombre,
             email
-        });
+        }, null, req);
 
+        establecerCookiesAuthHttpOnly(res, parTokens, req);
+        res.setHeader('X-CSRF-Token', parTokens.csrf_token);
+        registrarEventoSeguridad('USER_REGISTER_SUCCESS', 'INFO', `Alta de usuario con Cookie HttpOnly: ${email} (${rolNormalizado})`, req);
         return res.status(201).json({
             status: 'success',
             message: 'Usuario registrado correctamente',
-            token,
+            ...sanitizarMetadatosSesionParaBody(parTokens),
             usuario: {
                 id: usuarioId,
                 nombre,
@@ -619,6 +1231,186 @@ app.post('/auth/registro', async (req, res) => {
             message: 'El servicio de usuarios (PHP) no está disponible'
         });
     }
+});
+
+// =========================================================================
+// ROTACIÓN CONSTANTE Y REVOCACIÓN DE TOKENS (/auth/refresh, /auth/logout, /auth/token-status, /auth/security-status)
+// =========================================================================
+app.post('/auth/refresh', (req, res) => {
+    const cookies = req.cookies || parsearCookies(req);
+    const refreshTokenRecibido = String(
+        cookies[COOKIE_REFRESH_TOKEN] || (req.body && req.body.refresh_token) || ''
+    ).trim();
+    const ahora = Math.floor(Date.now() / 1000);
+
+    let sesionObjetivo = null;
+
+    if (refreshTokenRecibido) {
+        const hashRecibido = hashTokenOpaco(refreshTokenRecibido);
+
+        // Detección de robo / reuso de un refresh_token ya rotado
+        if (refreshTokensUsados.has(hashRecibido)) {
+            const infoRobo = refreshTokensUsados.get(hashRecibido);
+            if (infoRobo && infoRobo.sid && sesionesActivas.has(infoRobo.sid)) {
+                const sesionComprometida = sesionesActivas.get(infoRobo.sid);
+                if (sesionComprometida.currentJti) tokensRevocados.set(sesionComprometida.currentJti, ahora + JWT_EXPIRES_SECONDS);
+                if (sesionComprometida.previousJti) tokensRevocados.set(sesionComprometida.previousJti, ahora + JWT_EXPIRES_SECONDS);
+                sesionesActivas.delete(infoRobo.sid);
+            }
+            limpiarCookiesAuthHttpOnly(res, req);
+            registrarEventoSeguridad('TOKEN_REPLAY_DETECTED', 'CRITICO', 'Se detectó reutilización de un refresh_token antiguo. Familia de sesión revocada.', req);
+            return res.status(401).json({
+                status: 'error',
+                code: 'REFRESH_REPLAY_DETECTED',
+                message: 'No se pudo rotar el token: sesión expirada o refresh_token inválido. Inicia sesión nuevamente.'
+            });
+        }
+
+        for (const sesion of sesionesActivas.values()) {
+            if (sesion.refreshTokenHash === hashRecibido && ahora < sesion.expiresAt) {
+                sesionObjetivo = sesion;
+                break;
+            }
+        }
+    }
+
+    if (!sesionObjetivo && req.usuario && req.usuario.sid) {
+        const sesionPorJwt = sesionesActivas.get(req.usuario.sid);
+        if (sesionPorJwt && ahora < sesionPorJwt.expiresAt) {
+            sesionObjetivo = sesionPorJwt;
+        }
+    }
+
+    if (!sesionObjetivo && req.usuario) {
+        const nuevoPar = emitirParTokens({
+            sub: String(req.usuario.id),
+            rol: req.usuario.rol,
+            nombre: req.usuario.nombre,
+            email: req.usuario.email
+        }, null, req);
+        establecerCookiesAuthHttpOnly(res, nuevoPar, req);
+        res.setHeader('X-CSRF-Token', nuevoPar.csrf_token);
+        return res.status(200).json({
+            status: 'success',
+            message: 'Token rotado y actualizado en Cookie HttpOnly',
+            ...sanitizarMetadatosSesionParaBody(nuevoPar)
+        });
+    }
+
+    if (!sesionObjetivo) {
+        limpiarCookiesAuthHttpOnly(res, req);
+        return res.status(401).json({
+            status: 'error',
+            code: 'REFRESH_INVALID',
+            message: 'No se pudo rotar el token: sesión expirada o refresh_token inválido. Inicia sesión nuevamente.'
+        });
+    }
+
+    const nuevoPar = emitirParTokens(sesionObjetivo.userPayload, sesionObjetivo, req);
+    establecerCookiesAuthHttpOnly(res, nuevoPar, req);
+    res.setHeader('X-CSRF-Token', nuevoPar.csrf_token);
+
+    registrarEventoSeguridad('TOKEN_ROTATED', 'INFO', `Token rotado a ciclo #${nuevoPar.rot} en Cookie HttpOnly`, req);
+    return res.status(200).json({
+        status: 'success',
+        message: 'Token rotado y actualizado en Cookie HttpOnly',
+        ...sanitizarMetadatosSesionParaBody(nuevoPar)
+    });
+});
+
+app.post('/auth/logout', (req, res) => {
+    const ahora = Math.floor(Date.now() / 1000);
+    const cookies = req.cookies || parsearCookies(req);
+    const refreshCookie = cookies[COOKIE_REFRESH_TOKEN];
+
+    if (req.usuario) {
+        if (req.usuario.jti) {
+            tokensRevocados.set(req.usuario.jti, ahora + JWT_EXPIRES_SECONDS);
+        }
+        if (req.usuario.sid && sesionesActivas.has(req.usuario.sid)) {
+            const sesion = sesionesActivas.get(req.usuario.sid);
+            if (sesion.currentJti) tokensRevocados.set(sesion.currentJti, ahora + JWT_EXPIRES_SECONDS);
+            if (sesion.previousJti) tokensRevocados.set(sesion.previousJti, ahora + JWT_EXPIRES_SECONDS);
+            sesionesActivas.delete(req.usuario.sid);
+        }
+        registrarEventoSeguridad('USER_LOGOUT', 'INFO', `Cierre de sesión, limpieza de Cookies HttpOnly y revocación (${req.usuario.email})`, req);
+    } else if (refreshCookie) {
+        const hashCookie = hashTokenOpaco(refreshCookie);
+        for (const [sid, sesion] of sesionesActivas.entries()) {
+            if (sesion.refreshTokenHash === hashCookie) {
+                if (sesion.currentJti) tokensRevocados.set(sesion.currentJti, ahora + JWT_EXPIRES_SECONDS);
+                if (sesion.previousJti) tokensRevocados.set(sesion.previousJti, ahora + JWT_EXPIRES_SECONDS);
+                sesionesActivas.delete(sid);
+                break;
+            }
+        }
+    }
+
+    limpiarCookiesAuthHttpOnly(res, req);
+    return res.status(200).json({
+        status: 'success',
+        message: 'Sesión cerrada, Cookies HttpOnly eliminadas y tokens revocados inmediatamente'
+    });
+});
+
+app.get('/auth/token-status', exigirAutenticacion, (req, res) => {
+    const ahora = Math.floor(Date.now() / 1000);
+    const sesion = req.usuario.sid ? sesionesActivas.get(req.usuario.sid) : null;
+    return res.status(200).json({
+        status: 'success',
+        data: {
+            jti: req.usuario.jti || null,
+            sid: req.usuario.sid || null,
+            rot: sesion ? sesion.rotCount : (req.usuario.rot || 1),
+            csrf_token: sesion ? sesion.csrfToken : null,
+            fgp: req.usuario.fgp || null,
+            httponly_cookie: Boolean(req.usuario.httponly),
+            auth_source: req.usuario.auth_source || 'httponly_cookie',
+            expires_in: Math.max(0, (req.usuario.exp || ahora) - ahora),
+            rotation_interval_seconds: TOKEN_ROTATION_INTERVAL_SECONDS,
+            private_api_mode: true
+        }
+    });
+});
+
+app.get('/auth/security-status', exigirAutenticacion, (req, res) => {
+    const ahora = Math.floor(Date.now() / 1000);
+    const sesion = req.usuario.sid ? sesionesActivas.get(req.usuario.sid) : null;
+    return res.status(200).json({
+        status: 'success',
+        data: {
+            token_actual: {
+                jti: req.usuario.jti || null,
+                sid: req.usuario.sid || null,
+                rot: sesion ? sesion.rotCount : (req.usuario.rot || 1),
+                csrf_token: sesion ? sesion.csrfToken : null,
+                fgp: req.usuario.fgp || obtenerHuellaCliente(req),
+                httponly_cookie: true,
+                cookie_flags: 'HttpOnly; SameSite=Strict; Path=/',
+                auth_source: req.usuario.auth_source || 'httponly_cookie',
+                expires_in: Math.max(0, (req.usuario.exp || ahora) - ahora),
+                rotation_interval_seconds: TOKEN_ROTATION_INTERVAL_SECONDS
+            },
+            capas_activas: [
+                { nombre: 'Flujo de Autenticación con Tokens + Cookies HttpOnly', estado: 'ACTIVO', detalle: 'freelancer_access_token y freelancer_refresh_token en Cookies HttpOnly + SameSite=Strict (invisibles a document.cookie / XSS)' },
+                { nombre: 'APIs 100% Privadas (Zero Public Data)', estado: 'ACTIVO', detalle: 'Todos los endpoints exigen Cookie HttpOnly o Bearer Token válido' },
+                { nombre: 'Rotación Constante de JWT + Refresh Token', estado: 'ACTIVO', detalle: `Ciclo automático cada ${TOKEN_ROTATION_INTERVAL_SECONDS}s con lista negra JTI` },
+                { nombre: 'Detección de Robo / Replay de Refresh Token', estado: 'ACTIVO', detalle: 'Revocación inmediata de toda la familia de sesión si se reutiliza un token' },
+                { nombre: 'Vinculación Criptográfica de Dispositivo (Fingerprint)', estado: 'ACTIVO', detalle: `Huella SHA-256 vinculada (${req.usuario.fgp || obtenerHuellaCliente(req)})` },
+                { nombre: 'Protección Anti-CSRF Double-Submit (X-CSRF-Token)', estado: 'ACTIVO', detalle: 'Validación cruzada Cookie/Header en todas las operaciones POST, PUT, PATCH y DELETE' },
+                { nombre: 'Firma Interna Rotativa Gateway ↔ Microservicios', estado: 'ACTIVO', detalle: 'X-Internal-Key + HMAC-SHA256 con timestamp y nonce anti-replay' },
+                { nombre: 'WAF Ligero Anti-XSS / Anti-SQLi / Prototype Pollution', estado: 'ACTIVO', detalle: 'Inspección recursiva de body y query strings (límite 100 KB)' },
+                { nombre: 'Rate Limiting Global & Anti-Brute-Force en Login', estado: 'ACTIVO', detalle: `${RATE_LIMIT_MAX_REQ} req/min/IP · Bloqueo tras ${LOGIN_MAX_INTENTOS} intentos fallidos` },
+                { nombre: 'Cabeceras OWASP (CSP, NoSniff, Frame-Deny, No-Store)', estado: 'ACTIVO', detalle: 'Sin caché en disco de respuestas sensibles' }
+            ],
+            estadisticas: {
+                sesiones_activas: sesionesActivas.size,
+                tokens_revocados_en_lista_negra: tokensRevocados.size,
+                refresh_tokens_consumidos: refreshTokensUsados.size
+            },
+            eventos_recientes: eventosSeguridad.slice(0, 15)
+        }
+    });
 });
 
 app.get('/auth/me', exigirAutenticacion, async (req, res) => {
@@ -661,7 +1453,7 @@ app.use(['/usuarios', '/clientes'], exigirAdmin, (req, res) => {
     return reenviarA(PHP_API_URL, req, res);
 });
 
-app.get('/trabajadores', async (req, res) => {
+app.get('/trabajadores', exigirAutenticacion, async (req, res) => {
     try {
         const resultado = await llamarMicroservicio(PHP_API_URL, 'GET', '/trabajadores');
         if (resultado.status !== 200 || !resultado.data || !Array.isArray(resultado.data.data)) {
@@ -685,8 +1477,225 @@ app.get('/trabajadores/:id', exigirAutenticacion, (req, res, next) => {
 });
 app.use('/trabajadores', exigirAdmin, (req, res) => reenviarA(PHP_API_URL, req, res));
 
+// =========================================================================
+// PANEL DE RENDIMIENTO DE TRABAJADORES Y ENTREGABLES POR PROYECTO
+// =========================================================================
+const ENTREGABLES_FILE = path.resolve(__dirname, 'entregables_proyectos.json');
+
+function leerEntregablesArchivo() {
+    try {
+        if (fs.existsSync(ENTREGABLES_FILE)) {
+            const raw = fs.readFileSync(ENTREGABLES_FILE, 'utf8');
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+                return parsed;
+            }
+        }
+    } catch (e) {
+        console.error('Error leyendo entregables_proyectos.json:', e.message);
+    }
+    const iniciales = {
+        "1": [
+            {
+                id: 101,
+                proyecto_id: 1,
+                trabajador_id: 8,
+                autor_nombre: "Mateo Benítez",
+                titulo: "Sistema de Diseño Tokens & Flujo Checkout Web3",
+                tipo_entrega: "DISEÑO / PROTOTIPO",
+                url_recurso: "https://figma.com/file/nexapay-web3-checkout",
+                archivo_nombre: "nexapay-tokens-v2.fig",
+                progreso: 75,
+                descripcion: "Se completaron las pantallas del flujo de pago Web3, estados de carga y validación de billetera con soporte Dark Mode.",
+                fecha: "2026-11-05 16:30:00"
+            },
+            {
+                id: 102,
+                proyecto_id: 1,
+                trabajador_id: 8,
+                autor_nombre: "Mateo Benítez",
+                titulo: "Integración de Componentes React + Tailwind",
+                tipo_entrega: "CÓDIGO / REPOSITORIO",
+                url_recurso: "https://github.com/nexapay/web3-checkout-ui/pull/14",
+                archivo_nombre: "checkout-components-bundle.zip",
+                progreso: 90,
+                descripcion: "Implementación responsive de los componentes de confirmación de transacción y recibo descargable.",
+                fecha: "2026-11-08 11:15:00"
+            }
+        ],
+        "3": [
+            {
+                id: 103,
+                proyecto_id: 3,
+                trabajador_id: 8,
+                autor_nombre: "Mateo Benítez",
+                titulo: "Dashboard Clínico B2B — Módulos de Analítica",
+                tipo_entrega: "AVANCE DE SPRINT",
+                url_recurso: "https://figma.com/file/bloom-health-analytics",
+                archivo_nombre: "reporte-ux-bloomhealth.pdf",
+                progreso: 60,
+                descripcion: "Entrega de gráficas de cohortes clínicas, filtros por hospital y exportación de métricas.",
+                fecha: "2026-11-07 14:20:00"
+            }
+        ]
+    };
+    try {
+        fs.writeFileSync(ENTREGABLES_FILE, JSON.stringify(iniciales, null, 2), 'utf8');
+    } catch (e) {}
+    return iniciales;
+}
+
+function guardarEntregablesArchivo(data) {
+    try {
+        fs.writeFileSync(ENTREGABLES_FILE, JSON.stringify(data, null, 2), 'utf8');
+    } catch (e) {
+        console.error('Error guardando entregables_proyectos.json:', e.message);
+    }
+}
+
+app.get('/trabajadores-panel', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), async (req, res) => {
+    try {
+        const [resAsig, resReg] = await Promise.all([
+            llamarMicroservicio(EXPRESS_API_URL, 'GET', '/asignaciones'),
+            llamarMicroservicio(EXPRESS_API_URL, 'GET', '/registros-tiempo')
+        ]);
+        let asignaciones = (resAsig.status === 200 && resAsig.data && Array.isArray(resAsig.data.data))
+            ? resAsig.data.data
+            : [];
+        let registrosTiempo = (resReg.status === 200 && resReg.data && Array.isArray(resReg.data.data))
+            ? resReg.data.data
+            : [];
+        const todosEntregables = leerEntregablesArchivo();
+        let entregables = {};
+
+        if (req.usuario.rol === 'ADMIN') {
+            entregables = todosEntregables;
+        } else if (req.usuario.rol === 'TRABAJADOR') {
+            asignaciones = asignaciones.filter(a => Number(a.trabajador_id) === req.usuario.id);
+            const idsAsig = new Set(asignaciones.map(a => Number(a.id)));
+            const idsProy = new Set(asignaciones.map(a => String(a.proyecto_id)));
+            registrosTiempo = registrosTiempo.filter(r => idsAsig.has(Number(r.asignacion_id)));
+            for (const proyId of idsProy) {
+                if (todosEntregables[proyId]) {
+                    entregables[proyId] = todosEntregables[proyId];
+                }
+            }
+        } else if (req.usuario.rol === 'CLIENTE') {
+            const proyectosCliente = await obtenerProyectosCliente(req.usuario.id, res);
+            if (proyectosCliente === null) {
+                return;
+            }
+            const idsProyCliente = new Set(proyectosCliente.map(p => Number(p.id)));
+            asignaciones = asignaciones.filter(a => idsProyCliente.has(Number(a.proyecto_id)));
+            const idsAsig = new Set(asignaciones.map(a => Number(a.id)));
+            registrosTiempo = registrosTiempo.filter(r => idsAsig.has(Number(r.asignacion_id)));
+            for (const proyId of idsProyCliente) {
+                const clave = String(proyId);
+                if (todosEntregables[clave]) {
+                    entregables[clave] = todosEntregables[clave];
+                }
+            }
+        }
+
+        return res.json({
+            status: 'success',
+            data: {
+                asignaciones,
+                registrosTiempo,
+                entregables
+            }
+        });
+    } catch (error) {
+        console.error('Error en GET /trabajadores-panel:', error.message);
+        return res.status(502).json({
+            status: 'error',
+            message: 'No se pudo consolidar el panel de trabajadores.'
+        });
+    }
+});
+
+app.get('/proyectos/:id/entregables', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), (req, res) => {
+    const proyId = String(Number(req.params.id));
+    const todos = leerEntregablesArchivo();
+    const lista = Array.isArray(todos[proyId]) ? todos[proyId] : [];
+    return res.json({
+        status: 'success',
+        data: lista
+    });
+});
+
+app.post('/proyectos/:id/entregables', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), async (req, res) => {
+    const proyId = Number(req.params.id);
+    if (!Number.isSafeInteger(proyId) || proyId <= 0) {
+        return res.status(400).json({ status: 'error', message: 'ID de proyecto inválido.' });
+    }
+    const body = req.body || {};
+    const titulo = String(body.titulo || '').trim();
+    const descripcion = String(body.descripcion || '').trim();
+    if (!titulo || !descripcion) {
+        return res.status(400).json({
+            status: 'error',
+            message: 'El título y la descripción de la información/entregable son obligatorios.'
+        });
+    }
+
+    const todos = leerEntregablesArchivo();
+    const clave = String(proyId);
+    if (!Array.isArray(todos[clave])) {
+        todos[clave] = [];
+    }
+
+    const nuevo = {
+        id: Date.now(),
+        proyecto_id: proyId,
+        trabajador_id: Number(body.trabajador_id || (req.usuario && req.usuario.id) || 0) || null,
+        autor_nombre: String(body.autor_nombre || (req.usuario && req.usuario.nombre) || 'Especialista Asignado').trim(),
+        titulo,
+        tipo_entrega: String(body.tipo_entrega || 'AVANCE DE PROYECTO').trim(),
+        url_recurso: body.url_recurso ? String(body.url_recurso).trim() : null,
+        archivo_nombre: body.archivo_nombre ? String(body.archivo_nombre).trim() : null,
+        progreso: Math.min(100, Math.max(0, Number(body.progreso ?? 50) || 0)),
+        descripcion,
+        fecha: new Date().toISOString().slice(0, 19).replace('T', ' ')
+    };
+
+    todos[clave].unshift(nuevo);
+    guardarEntregablesArchivo(todos);
+
+    return res.status(201).json({
+        status: 'success',
+        message: 'Información subida al proyecto correctamente.',
+        data: nuevo
+    });
+});
+
+app.patch('/proyectos/:id', exigirRoles('TRABAJADOR', 'CLIENTE', 'ADMIN'), async (req, res) => {
+    try {
+        const proyId = Number(req.params.id);
+        const resProy = await llamarMicroservicio(PYTHON_API_URL, 'GET', `/proyectos/${proyId}`);
+        if (resProy.status !== 200 || !resProy.data) {
+            return res.status(resProy.status).json(resProy.data);
+        }
+        if (req.usuario.rol === 'CLIENTE' && Number(resProy.data.cliente_id) !== req.usuario.id) {
+            return res.status(403).json({ status: 'error', message: 'Solo el cliente propietario puede modificar este proyecto.' });
+        }
+        if (req.usuario.rol === 'TRABAJADOR') {
+            const resAsig = await llamarMicroservicio(EXPRESS_API_URL, 'GET', `/asignaciones?trabajador_id=${req.usuario.id}`);
+            const asignaciones = (resAsig.status === 200 && resAsig.data && Array.isArray(resAsig.data.data)) ? resAsig.data.data : [];
+            const tieneAsignacion = asignaciones.some(a => Number(a.proyecto_id) === proyId);
+            if (!tieneAsignacion) {
+                return res.status(403).json({ status: 'error', message: 'Solo el trabajador asignado al proyecto puede actualizar su estado.' });
+            }
+        }
+        return reenviarA(PYTHON_API_URL, req, res);
+    } catch (error) {
+        console.error('Error en PATCH /proyectos/:id:', error.message);
+        return res.status(502).json({ status: 'error', message: 'No se pudo actualizar el proyecto.' });
+    }
+});
+
 app.use('/proyectos/:id', (req, res, next) => {
-    if (['PATCH', 'DELETE'].includes(req.method)) {
+    if (req.method === 'DELETE') {
         return exigirAdmin(req, res, next);
     }
     next();
@@ -850,7 +1859,7 @@ app.patch('/postulaciones/:id', exigirRoles('CLIENTE', 'ADMIN'), async (req, res
     }
 });
 
-app.use(['/proyectos', '/postulaciones'], (req, res) => {
+app.use(['/proyectos', '/postulaciones'], exigirAutenticacion, (req, res) => {
     return reenviarA(PYTHON_API_URL, req, res);
 });
 
