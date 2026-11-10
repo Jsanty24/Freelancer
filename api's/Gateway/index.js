@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -1192,7 +1192,7 @@ app.post('/auth/registro', async (req, res) => {
             const resTrabajador = await llamarMicroservicio(PHP_API_URL, 'POST', '/trabajadores', {
                 usuario_id: usuarioId,
                 especialidad,
-                disponibilidad: disponibilidad ?? true
+                disponibilidad: (disponibilidad === false || disponibilidad === 'false' || disponibilidad === '0' || disponibilidad === 0) ? 0 : 1
             });
             if (resTrabajador.status !== 201) {
                 await llamarMicroservicio(PHP_API_URL, 'DELETE', `/usuarios/${usuarioId}`);

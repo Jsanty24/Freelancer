@@ -1,4 +1,4 @@
-﻿#   1. API 1 — PHP (Usuarios, Clientes, Trabajadores, Login) -> 127.0.0.1:8000
+#   1. API 1 — PHP (Usuarios, Clientes, Trabajadores, Login) -> 127.0.0.1:8000
 #   2. API 2 — Python FastAPI (Proyectos y Postulaciones)    -> 127.0.0.1:5000
 #   3. API 3 — Node.js Express (Asignaciones, Horas, Facturas) -> 127.0.0.1:3000
 #   4. API 4 — Node.js API Gateway + Frontend Stitch         -> http://localhost:4000
@@ -27,6 +27,7 @@ if ($GatewaySettings['JWT_SECRET'].Length -lt 32) {
 
 $Env:INTERNAL_API_KEY = $GatewaySettings['INTERNAL_API_KEY']
 $Env:JWT_SECRET = $GatewaySettings['JWT_SECRET']
+$Env:DB_NAME = 'plataforma_freelance_demo'
 
 function Test-LocalPort([int]$Port) {
     $Client = New-Object Net.Sockets.TcpClient
